@@ -2,7 +2,9 @@
 
 -export([solve/1]).
 
--define(SUITS, [a, b, c, d]).
+-ifdef(TEST).
+-compile(export_all).
+-endif.
 
 solve(Cards) ->
   Stacks = stacks(Cards),
@@ -71,9 +73,10 @@ stack_to_stack_moves({SubStacks, OtherStacks, State}) ->
 stack_to_stack_moves_({SubStack, OtherStacks, State}) ->
     NewStates =
         [stack_to_stack_move(SubStack,
-                 OtherStack,
-                 _RestOfOther = lists:delete(OtherStack, OtherStacks),
-                 State)
+                             OtherStack,
+                             _RestOfOther =
+                                 lists:delete(OtherStack, OtherStacks),
+                             State)
                         || OtherStack <- OtherStacks],
     lists:filter(fun is_valid_stack_move/1, NewStates).
 
@@ -86,9 +89,16 @@ stack_to_stack_move(SubStack,
     NewSourceStack = remove_substack(SubStack, Stacks),
     NewTargetStack = SubStack ++ OtherStack,
     NewStacks = [NewSourceStack, NewTargetStack | RestOfStacks],
+    PrevStacks1 =
+        case NewSourceStack of
+            [] ->
+                [NewTargetStack | PrevStacks];
+            _ ->
+                [NewSourceStack, NewTargetStack | PrevStacks]
+        end,
     Move = {SubStack, '->', OtherStack},
     State#{moves => [Move | Moves],
-           previous_stacks => NewStacks ++ PrevStacks,
+           previous_stacks => PrevStacks1,
            stacks => NewStacks}.
 
 remove_substack([X | _] = SubStack, [[X | _] = Stack | _Stacks]) ->
@@ -238,9 +248,13 @@ is_valid_stack_move(#{moves := [{[{1, Suit} =_SingleCard],
 is_valid_stack_move(#{moves := [{[{SourceNumber, Suit}] = _SingleCard,
                                  '->',
                                  {finished, Suit} = Target} | _]} = State) ->
-    [{TargetNumber, _Suit} | _] = maps:get(Target, State),
-    _CardIsNextInSuit =
-        SourceNumber == TargetNumber + 1;
+    case maps:get(Target, State) of
+        [{TargetNumber, _Suit} | _] ->
+            _CardIsNextInSuit =
+                SourceNumber == TargetNumber + 1;
+        _ ->
+            false
+    end;
 is_valid_stack_move(#{moves := [{[{_, Suit} = _SingleCard],
                               '->',
                               {finished, NotSuit}}  | _]} = _State)
@@ -252,10 +266,10 @@ is_valid_stack_move(#{moves := [{[{dragon, _}] = _SingleCard,
                                 {finished, _}}  | _]} = _State) ->
     _CanPutDragonInFinishedPile =
         false;
-is_valid_stack_move(#{moves := [MovedStack | _],
+is_valid_stack_move(#{moves := [{MovedStack, '->', _} | _],
                       stacks := Stacks,
-                      previous_stacks := PreviousStacks} = _State) ->
-    IsBackTrackingFun = fun(Stack) -> lists:member(Stack, PreviousStacks) end,
+                      previous_stacks := PrevStacks} = _State) ->
+    IsBackTrackingFun = fun(Stack) -> lists:member(Stack, PrevStacks) end,
     IsBacktracking = lists:any(IsBackTrackingFun, Stacks),
     MaybeNumbers = [MaybeNumber || {MaybeNumber, _Suit} <- MovedStack],
     IsOnlyNumbers = MovedStack == lists:filter(fun is_integer/1, MaybeNumbers),
@@ -289,14 +303,14 @@ get_orig_target_stack([_ | _] = Addition, [_ | Rest]) ->
 
 remove_stack([], Remaining) ->
     Remaining;
-remove_stack([_ | Rest1], [_, Rest2]) ->
+remove_stack([_ | Rest1], [_ | Rest2]) ->
     remove_stack(Rest1, Rest2).
 
 has_alternating_suits([]) ->
     true;
 has_alternating_suits([_]) ->
     true;
-has_alternating_suits([X, X | _]) ->
+has_alternating_suits([{_, Suit}, {_, Suit} | _]) ->
     false;
 has_alternating_suits([_ | Rest]) ->
     has_alternating_suits(Rest).
