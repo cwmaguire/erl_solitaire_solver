@@ -2,6 +2,7 @@
 
 -export([all/0]).
 %% I know I could do export_all, but I like this. Sue me. :)
+-export([test_has_matching_free_cell_dragon/1]).
 -export([test_dragon_free_cells/1]).
 -export([test_add_dragon/1]).
 -export([test_slay_dragon/1]).
@@ -15,7 +16,8 @@
 -define(SS, solitaire_solver).
 
 all() ->
-    [test_dragon_free_cells,
+    [test_has_matching_free_cell_dragon,
+     test_dragon_free_cells,
      test_add_dragon,
      test_slay_dragon,
      test_remove_dragon,
@@ -24,6 +26,10 @@ all() ->
      test_remove_stack,
      test_has_alternating_suits,
      test_substacks].
+
+test_has_matching_free_cell_dragon(_Config) ->
+    false = ?SS:has_matching_free_cell_dragon(1, #{}),
+    true = ?SS:has_matching_free_cell_dragon(1, #{{free, 1} => {dragon, 1}}).
 
 test_dragon_free_cells(_Config) ->
     State = #{{free, 1} => empty,

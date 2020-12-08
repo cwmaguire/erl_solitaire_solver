@@ -197,7 +197,7 @@ is_empty_free_cell(_) ->
     false.
 
 has_matching_free_cell_dragon(DragonNum, State) ->
-    not ([] == dragon_free_cells(DragonNum, State)).
+    0 < length(dragon_free_cells(DragonNum, State)).
 
 dragon_free_cells(DragonNum, State) ->
     [FC || FC = {{free, _N}, {dragon, DragonNum_}} <- maps:to_list(State),
