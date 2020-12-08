@@ -172,8 +172,8 @@ slay_dragon_moves(State) ->
     [maybe_slay_dragon(VisibleDragon, State) || VisibleDragon <- VisibleDragons].
 
 visible_dragons(#{stacks := Stacks} = State) ->
-    FreeCards = [Card || Card = {{free, _}, Card} <- maps:to_list(State), Card /= empty],
-    TopCards = [TopCard || [TopCard | _] <- Stacks],
+    FreeCards = [Card || {{free, _}, Card} <- maps:to_list(State), Card /= empty],
+    TopCards = [TopCard || Stack = [TopCard | _] <- Stacks, Stack /= []],
     DragonCounts =
         lists:foldl(fun add_dragon/2, #{}, FreeCards ++ TopCards),
     [N || {N, Count} <- maps:to_list(DragonCounts), Count == 4].
@@ -205,7 +205,9 @@ dragon_free_cells(DragonNum, State) ->
 
 add_dragon({dragon, N}, Counts) ->
     CurrentCount = maps:get(N, Counts, 0),
-    Counts#{N => CurrentCount + 1}.
+    Counts#{N => CurrentCount + 1};
+add_dragon(_NotDragon, Counts) ->
+    Counts.
 
 slay_dragon(DragonNum, #{stacks := Stacks,
                          moves := Moves} = State) ->

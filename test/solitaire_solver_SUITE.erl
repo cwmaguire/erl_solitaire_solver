@@ -2,6 +2,7 @@
 
 -export([all/0]).
 %% I know I could do export_all, but I like this. Sue me. :)
+-export([test_visible_dragons/1]).
 -export([test_maybe_slay_dragon/1]).
 -export([test_has_empty_free_cell/1]).
 -export([test_has_matching_free_cell_dragon/1]).
@@ -18,7 +19,8 @@
 -define(SS, solitaire_solver).
 
 all() ->
-    [test_maybe_slay_dragon,
+    [test_visible_dragons,
+     test_maybe_slay_dragon,
      test_has_empty_free_cell,
      test_has_matching_free_cell_dragon,
      test_dragon_free_cells,
@@ -30,6 +32,43 @@ all() ->
      test_remove_stack,
      test_has_alternating_suits,
      test_substacks].
+
+test_visible_dragons(_Config) ->
+    State1 =
+        #{{free, 1} => {dragon, 1},
+          {free, 2} => {dragon, 2},
+          {free, 3} => empty,
+          stacks => [[{1, red}, {2, green}, {dragon, 1}],
+                     [{3, black}, {4, red}, {dragon, 1}],
+                     [{dragon, 3}, {dragon, 1}],
+                     _EmptyStack = []]},
+
+    [] = ?SS:visible_dragons(State1),
+
+    State2 =
+        #{{free, 1} => {dragon, 1},
+          {free, 2} => {dragon, 1},
+          {free, 3} => empty,
+          stacks => [[{dragon, 1}, {1, red}, {2, green}],
+                     [{dragon, 1}, {3, black}, {4, red}],
+                     [{dragon, 2}],
+                     _EmptyStack = []]},
+
+    [1] = ?SS:visible_dragons(State2),
+
+    State3 =
+        #{{free, 1} => {dragon, 1},
+          {free, 2} => {dragon, 1},
+          {free, 3} => {dragon, 2},
+          stacks => [[{dragon, 1}, {1, red}, {2, green}],
+                     [{dragon, 1}, {3, black}, {4, red}],
+                     [{dragon, 2}, {5, gree}, {6, black}],
+                     [{dragon, 2}],
+                     [{dragon, 2}],
+                     _EmptyStack = []]},
+
+    [1, 2] = lists:sort(?SS:visible_dragons(State3)).
+
 
 test_maybe_slay_dragon(_Config) ->
     StateWithZeroAvailFreeCells
@@ -113,7 +152,8 @@ test_add_dragon(_Config) ->
     #{1 := 1} = ?SS:add_dragon({dragon, 1}, Counts),
     #{2 := 2} = ?SS:add_dragon({dragon, 2}, Counts),
     #{3 := 3} = ?SS:add_dragon({dragon, 3}, Counts),
-    #{4 := 1} = ?SS:add_dragon({dragon, 4}, Counts).
+    #{4 := 1} = ?SS:add_dragon({dragon, 4}, Counts),
+    #{} = ?SS:add_dragon({1, red}, Counts).
 
 test_slay_dragon(_Config) ->
     StateWithDragonInZeroFreeCells
