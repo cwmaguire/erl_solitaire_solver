@@ -38,7 +38,7 @@ is_stack_empty([]) ->
 is_stack_empty([_ | _]) ->
     false.
 
-% is_slayed_dragon(slayed_dragon) ->
+% is_slayed_dragon({slayed_dragon, _}) ->
 %     true;
 % is_slayed_dragon(_) ->
 %     false.
@@ -211,19 +211,21 @@ count_dragons({dragon, N}, Counts) ->
 
 slay_dragon(DragonNum, #{stacks := Stacks,
                          moves := Moves} = State) ->
-    DragonFreeCellNumber =
+    {{free, DragonFreeCellNumber}, _} =
         case dragon_free_cells(DragonNum, State) of
-            undefined ->
+            [] ->
                 hd(lists:filter(fun is_empty_free_cell/1, maps:to_list(State)));
-            [{{free, N}, _} = _DragonFreeCell | _] ->
-                N
+            [{{free, _N}, _} = DragonFreeCell | _] ->
+                DragonFreeCell
         end,
     OtherDragonFreeCells =
-        [FC || FC = {{free, M}, {dragon, _DragonNum}} <- maps:to_list(State), DragonFreeCellNumber /= M],
+        [FC || FC = {{free, M}, {dragon, DragonNum_}} <- maps:to_list(State),
+                                                         DragonFreeCellNumber /= M,
+                                                         DragonNum == DragonNum_],
     StacksWithDragons =
-        [S || S = [{dragon, _DragonNum} | _] <- Stacks],
+        [S || S = [{dragon, DragonNum_} | _] <- Stacks, DragonNum == DragonNum_],
     State2 = lists:foldl(fun remove_dragon/2, State, OtherDragonFreeCells ++ StacksWithDragons),
-    State2#{{free, DragonFreeCellNumber} => slayed_dragon,
+    State2#{{free, DragonFreeCellNumber} => {slayed_dragon, DragonNum},
             moves => [{slay, DragonNum} | Moves]}.
 
 remove_dragon([{dragon, _DragonNum} | StackTail] = Stack,

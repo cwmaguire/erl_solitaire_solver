@@ -2,6 +2,7 @@
 
 -export([all/0]).
 %% I know I could do export_all, but I like this. Sue me. :)
+-export([test_slay_dragon/1]).
 -export([test_remove_dragon/1]).
 -export([test_is_valid_stack_move/1]).
 -export([test_get_orig_target_stack/1]).
@@ -12,12 +13,106 @@
 -define(SS, solitaire_solver).
 
 all() ->
-    [test_remove_dragon,
+    [test_slay_dragon,
+     test_remove_dragon,
      test_is_valid_stack_move,
      test_get_orig_target_stack,
      test_remove_stack,
      test_has_alternating_suits,
      test_substacks].
+
+%% dragon in 0 free cells
+%% dragon in 1 free cell
+%% dragon in 2 free cells
+%% dragon in 3 free cells
+test_slay_dragon(_Config) ->
+    StateWithDragonInZeroFreeCells
+       = #{stacks => [[{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 2}],
+                      [{green, 9}]],
+           {free, 1} => empty,
+           {free, 2} => {1, red},
+           {free, 3} => {dragon, 2},
+           moves => []},
+    #{{free, 1} := {slayed_dragon, 1},
+      {free, 2} := {1, red},
+      {free, 3} := {dragon, 2},
+      stacks := Stacks1,
+      moves := [{slay, 1}]} =
+        ?SS:slay_dragon(1, StateWithDragonInZeroFreeCells),
+
+    [[], [], [], [], [{dragon, 2}], [{green, 9}]] =
+        lists:sort(Stacks1),
+
+    StateWithDragonInOneFreeCell
+       = #{stacks => [[{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 2}],
+                      [{green, 9}]],
+           {free, 1} => {dragon, 1},
+           {free, 2} => {1, red},
+           {free, 3} => {dragon, 2},
+           moves => []},
+    #{{free, 1} := {slayed_dragon, 1},
+      {free, 2} := {1, red},
+      {free, 3} := {dragon, 2},
+      stacks := Stacks2,
+      moves := [{slay, 1}]} =
+        ?SS:slay_dragon(1, StateWithDragonInOneFreeCell),
+
+    [[], [], [], [{dragon, 2}], [{green, 9}]] =
+        lists:sort(Stacks2),
+
+    StateWithDragonInTwoFreeCells
+       = #{stacks => [[{black, 7}],
+                      [{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 2}],
+                      [{green, 9}]],
+           {free, 1} => {dragon, 1},
+           {free, 2} => {dragon, 1},
+           {free, 3} => {dragon, 2},
+           moves => []},
+    #{{free, 1} := Free1Value,
+      {free, 2} := Free2Value,
+      {free, 3} := {dragon, 2},
+      stacks := Stacks3,
+      moves := [{slay, 1}]} =
+        ?SS:slay_dragon(1, StateWithDragonInTwoFreeCells),
+
+    [[], [], [{black, 7}], [{dragon, 2}], [{green, 9}]] =
+        lists:sort(Stacks3),
+
+    [empty, {slayed_dragon, 1}] = lists:sort([Free1Value, Free2Value]),
+
+    StateWithDragonInThreeFreeCells
+       = #{stacks => [[{black, 7}],
+                      [{red, 5}],
+                      [{dragon, 1}],
+                      [{dragon, 2}],
+                      [{green, 9}]],
+           {free, 1} => {dragon, 1},
+           {free, 2} => {dragon, 1},
+           {free, 3} => {dragon, 1},
+           moves => []},
+    Y = ?SS:slay_dragon(1, StateWithDragonInThreeFreeCells),
+    ct:pal("~p: Y~n\t~p~n", [?MODULE, Y]),
+    #{{free, 1} := Free1Value,
+      {free, 2} := Free2Value,
+      {free, 3} := Free3Value,
+      stacks := Stacks4,
+      moves := [{slay, 1}]} =
+        ?SS:slay_dragon(1, StateWithDragonInThreeFreeCells),
+
+    [[], [{black, 7}], [{dragon, 2}], [{green, 9}], [{red, 5}]] =
+        lists:sort(Stacks4),
+
+    [empty, empty, {slayed_dragon, 1}] =
+        lists:sort([Free1Value, Free2Value, Free3Value]).
 
 test_remove_dragon(_Config) ->
     Stack1 = [{dragon, 1}, {1, red}, {2, green}],
