@@ -2,6 +2,7 @@
 
 -export([all/0]).
 %% I know I could do export_all, but I like this. Sue me. :)
+-export([test_slay_dragon_moves/1]).
 -export([test_visible_dragons/1]).
 -export([test_maybe_slay_dragon/1]).
 -export([test_has_empty_free_cell/1]).
@@ -19,7 +20,8 @@
 -define(SS, solitaire_solver).
 
 all() ->
-    [test_visible_dragons,
+    [test_slay_dragon_moves,
+     test_visible_dragons,
      test_maybe_slay_dragon,
      test_has_empty_free_cell,
      test_has_matching_free_cell_dragon,
@@ -32,6 +34,39 @@ all() ->
      test_remove_stack,
      test_has_alternating_suits,
      test_substacks].
+
+test_slay_dragon_moves(_Config) ->
+    StateWithNoSlayableDragons =
+        #{stacks => []},
+    [] = ?SS:slay_dragon_moves(StateWithNoSlayableDragons),
+
+    StateWithOneSlayableDragons1 =
+        #{{free, 1} => {dragon, 1},
+          stacks => [[{dragon, 1}],
+                     [{dragon, 1}],
+                     [{dragon, 1}]],
+          moves => []},
+    [#{{free, 1} := {slayed_dragon, 1},
+       stacks := [[], [], []],
+       moves := [{slay, 1}]}] =
+        ?SS:slay_dragon_moves(StateWithOneSlayableDragons1),
+
+    StateWithOneSlayableDragons2 =
+        #{{free, 1} => {dragon, 1},
+          {free, 2} => {dragon, 1},
+          stacks => [[{dragon, 1}],
+                     [{dragon, 1}],
+                     [{2, red}]],
+          moves => []},
+    [State = #{{free, 1} := Free1,
+               {free, 2} := Free2,
+               stacks := Stacks,
+               moves := [{slay, 1}]}] =
+        ?SS:slay_dragon_moves(StateWithOneSlayableDragons2),
+
+    [empty, {slayed_dragon, 1}] =
+        lists:sort([V || {{free, _}, V} <- maps:to_list(State)]),
+    [[], [], [{2, red}]] = lists:sort(Stacks).
 
 test_visible_dragons(_Config) ->
     State1 =
