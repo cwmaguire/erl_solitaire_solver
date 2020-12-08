@@ -2,6 +2,7 @@
 
 -export([all/0]).
 %% I know I could do export_all, but I like this. Sue me. :)
+-export([test_remove_dragon/1]).
 -export([test_is_valid_stack_move/1]).
 -export([test_get_orig_target_stack/1]).
 -export([test_remove_stack/1]).
@@ -11,11 +12,30 @@
 -define(SS, solitaire_solver).
 
 all() ->
-    [test_is_valid_stack_move,
+    [test_remove_dragon,
+     test_is_valid_stack_move,
      test_get_orig_target_stack,
      test_remove_stack,
      test_has_alternating_suits,
      test_substacks].
+
+test_remove_dragon(_Config) ->
+    Stack1 = [{dragon, 1}, {1, red}, {2, green}],
+    Stack2 = [{3, black}, {1, red}, {2, green}],
+    Stack3 = [{9, red}, {1, red}, {5, black}],
+
+    Stacks = [Stack1, Stack2, Stack3],
+
+    State = #{stacks => Stacks,
+              moves => [{slay, 1}]},
+
+    #{stacks := NewStacks} = ?SS:remove_dragon(Stack1, State),
+    true = lists:member(tl(Stack1), NewStacks),
+    false = lists:member(Stack1, NewStacks),
+    [] = [D || D = {dragon, _} <- lists:flatten(NewStacks)],
+    true = lists:member(Stack2, NewStacks),
+    true = lists:member(Stack3, NewStacks),
+    3 == length(NewStacks).
 
 test_is_valid_stack_move(_Config) ->
     MoveSingleCardToEmptyFreeCell =
