@@ -2,6 +2,8 @@
 
 -export([all/0]).
 %% I know I could do export_all, but I like this. Sue me. :)
+-export([test_dragon_free_cells/1]).
+-export([test_add_dragon/1]).
 -export([test_slay_dragon/1]).
 -export([test_remove_dragon/1]).
 -export([test_is_valid_stack_move/1]).
@@ -13,7 +15,9 @@
 -define(SS, solitaire_solver).
 
 all() ->
-    [test_slay_dragon,
+    [test_dragon_free_cells,
+     test_add_dragon,
+     test_slay_dragon,
      test_remove_dragon,
      test_is_valid_stack_move,
      test_get_orig_target_stack,
@@ -21,10 +25,23 @@ all() ->
      test_has_alternating_suits,
      test_substacks].
 
-%% dragon in 0 free cells
-%% dragon in 1 free cell
-%% dragon in 2 free cells
-%% dragon in 3 free cells
+test_dragon_free_cells(_Config) ->
+    State = #{{free, 1} => empty,
+              {free, 2} => {dragon, 1},
+              {free, 3} => {dragon, 2},
+              finished => {3, green},
+              stacks => [[{1, red}], [{dragon, 3}, {2, black}]],
+              moves => [{[{1, green}], '->', [{2, black}]}]},
+
+    [{{free, 3}, {dragon, 2}}] = ?SS:dragon_free_cells(2, State).
+
+test_add_dragon(_Config) ->
+    Counts = #{1 => 0, 2 => 1, 3 => 2, foo => bar},
+    #{1 := 1} = ?SS:add_dragon({dragon, 1}, Counts),
+    #{2 := 2} = ?SS:add_dragon({dragon, 2}, Counts),
+    #{3 := 3} = ?SS:add_dragon({dragon, 3}, Counts),
+    #{4 := 1} = ?SS:add_dragon({dragon, 4}, Counts).
+
 test_slay_dragon(_Config) ->
     StateWithDragonInZeroFreeCells
        = #{stacks => [[{dragon, 1}],
@@ -99,8 +116,6 @@ test_slay_dragon(_Config) ->
            {free, 2} => {dragon, 1},
            {free, 3} => {dragon, 1},
            moves => []},
-    Y = ?SS:slay_dragon(1, StateWithDragonInThreeFreeCells),
-    ct:pal("~p: Y~n\t~p~n", [?MODULE, Y]),
     #{{free, 1} := Free1Value,
       {free, 2} := Free2Value,
       {free, 3} := Free3Value,
