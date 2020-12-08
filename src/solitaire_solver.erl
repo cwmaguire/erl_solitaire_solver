@@ -96,7 +96,7 @@ stack_to_stack_move(SubStack,
             _ ->
                 [NewSourceStack, NewTargetStack | PrevStacks]
         end,
-    Move = {SubStack, '->', OtherStack},
+    Move = {SubStack, '->', hd(OtherStack)},
     State#{moves => [Move | Moves],
            previous_stacks => PrevStacks1,
            stacks => NewStacks}.
@@ -107,12 +107,11 @@ remove_substack(SubStack, [_ | Stacks]) ->
     remove_substack(SubStack, Stacks).
 
 cards_to_free_moves(#{stacks := Stacks} = State) ->
-    FreeCells = [FC || FC = {{free, _}, empty} <- maps:to_list(State)],
-    %FreeCells = [_KV = {{free, N}, maps:get({free, N}, State)} || N <- lists:seq(1, 3)],
-    EmptyFreeCells =
-        [EmptyFreeCell || EmptyFreeCell = [{free, _}, empty] <- FreeCells],
-    [card_to_free_move(EmptyFreeCell, Stack, State) || EmptyFreeCell <- EmptyFreeCells,
-                                                        Stack <- Stacks].
+    EmptyFreeCells = [FC || FC = {{free, _}, empty} <- maps:to_list(State)],
+    [card_to_free_move(EmptyFreeCell,
+                       Stack,
+                       State) || EmptyFreeCell <- EmptyFreeCells,
+                                 Stack <- Stacks].
 
 card_to_free_move({{free, N}, empty},
                    [Card | RestOfStack] = Stack,
@@ -120,10 +119,9 @@ card_to_free_move({{free, N}, empty},
                      moves := Moves} = State) ->
     OtherStacks = lists:delete(Stack, Stacks),
     NewStacks = [RestOfStack | OtherStacks],
-    NewFreeCell = {{free, N}, Card},
     State#{stacks => NewStacks,
-           {free, N} => NewFreeCell,
-           moves => [{Card, '->', Stack} | Moves]};
+           {free, N} => Card,
+           moves => [{Card, '->', hd(Stack)} | Moves]};
 card_to_free_move(_FreeCell, _Stack, _State) ->
     _InvalidMove = [].
 
@@ -144,10 +142,9 @@ free_to_stack_move({{free, Suit}, Card},
                      moves := Moves} = State) ->
     OtherStacks = lists:delete(Stack, Stacks),
     NewStack = [Card | Stack],
-    NewFreeCell = {{free, Suit}, empty},
     State#{stacks => [NewStack | OtherStacks],
-           {free, Suit} => NewFreeCell,
-           moves => [{Card, '->', Stack} | Moves]}.
+           {free, Suit} => empty,
+           moves => [{Card, '->', hd(Stack)} | Moves]}.
 
 cards_to_finish_moves(#{stacks := Stacks} = State) ->
     FinishCells = [FC || FC = {{finish, _}, _Cards} <- maps:to_list(State)],
