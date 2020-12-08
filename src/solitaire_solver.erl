@@ -107,11 +107,8 @@ remove_substack(SubStack, [_ | Stacks]) ->
     remove_substack(SubStack, Stacks).
 
 cards_to_free_moves(#{stacks := Stacks} = State) ->
-    EmptyFreeCells = [FC || FC = {{free, _}, empty} <- maps:to_list(State)],
-    [card_to_free_move(EmptyFreeCell,
-                       Stack,
-                       State) || EmptyFreeCell <- EmptyFreeCells,
-                                 Stack <- Stacks].
+    [EmptyFreeCell | _] = [FC || FC = {{free, _}, empty} <- maps:to_list(State)],
+    [card_to_free_move(EmptyFreeCell, Stack, State) || Stack <- Stacks].
 
 card_to_free_move({{free, N}, empty},
                    [Card | RestOfStack] = Stack,
@@ -121,7 +118,7 @@ card_to_free_move({{free, N}, empty},
     NewStacks = [RestOfStack | OtherStacks],
     State#{stacks => NewStacks,
            {free, N} => Card,
-           moves => [{Card, '->', hd(Stack)} | Moves]};
+           moves => [{Card, '->', {free, N}} | Moves]};
 card_to_free_move(_FreeCell, _Stack, _State) ->
     _InvalidMove = [].
 

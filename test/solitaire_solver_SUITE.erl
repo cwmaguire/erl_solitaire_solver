@@ -2,6 +2,7 @@
 
 -export([all/0]).
 %% I know I could do export_all, but I like this. Sue me. :)
+-export([test_cards_to_free_moves/1]).
 -export([test_slay_dragon_moves/1]).
 -export([test_visible_dragons/1]).
 -export([test_maybe_slay_dragon/1]).
@@ -20,7 +21,8 @@
 -define(SS, solitaire_solver).
 
 all() ->
-    [test_slay_dragon_moves,
+    [test_cards_to_free_moves,
+     test_slay_dragon_moves,
      test_visible_dragons,
      test_maybe_slay_dragon,
      test_has_empty_free_cell,
@@ -34,6 +36,27 @@ all() ->
      test_remove_stack,
      test_has_alternating_suits,
      test_substacks].
+
+test_cards_to_free_moves(_config) ->
+    State =
+        #{{free, 1} => empty,
+          {free, 2} => {1, red},
+          {free, 3} => empty,
+          stacks => [[{2, black}],
+                     [{3, green}, {4, red}]],
+          moves => []},
+
+	[#{moves := [{{2,black},'->',{free,1}}],
+       stacks := [[],[{3,green},{4,red}]],
+       {free,1} := {2,black},
+       {free,2} := {1,red},
+       {free,3} := empty},
+     #{moves := [{{3,green},'->',{free,1}}],
+       stacks := [[{4,red}],[{2,black}]],
+       {free,1} := {3,green},
+       {free,2} := {1,red},
+       {free,3} := empty}] = lists:sort(?SS:cards_to_free_moves(State)).
+
 
 test_slay_dragon_moves(_Config) ->
     StateWithNoSlayableDragons =
