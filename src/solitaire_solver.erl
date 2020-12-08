@@ -77,7 +77,6 @@ stack_to_stack_moves_({SubStack, OtherStacks, State}) ->
         [{PrevStacks, NewSourceStack, State} || {NewSourceStack, State} <- NewStates],
     ValidMovesPlusPrevStacks =
         lists:filter(fun is_valid_stack_move/1, FilterableStates),
-    ct:pal("~p: ValidMovesPlusPrevStacks~n\t~p~n", [?MODULE, ValidMovesPlusPrevStacks]),
     [ValidState || {_, _, ValidState} <- ValidMovesPlusPrevStacks].
 
 
@@ -301,38 +300,6 @@ is_valid_stack_move({PrevStacks,
             [{TargetNumber, TargetSuit} = _OldTop | _] ->
                 AreSequential = (SourceNumber + 1 == TargetNumber),
                 AreDifferentSuits = (SourceSuit /= TargetSuit),
-                %ct:pal("~p: "
-                       %"Stacks~n\t~p~n"
-                       %"MovedStack~n\t~p~n"
-                       %"PrevStacks~n\t~p~n"
-                       %"NewSourceStack~n\t~p~n"
-                       %"OrigTargetStack~n\t~p~n"
-                       %"SourceNumber~n\t~p~n"
-                       %"SourceSuit~n\t~p~n"
-                       %"TargetNumber~n\t~p~n"
-                       %"TargetSuit~n\t~p~n"
-                       %"AreSequential~n\t~p~n"
-                       %"AreDifferentSuits~n\t~p~n"
-                       %"IsBacktracking~n\t~p~n"
-                       %"IsOnlyNumbers~n\t~p~n"
-                       %"IsInOrder~n\t~p~n"
-                       %"HasAlternatingSuits~n\t~p~n",
-                       %[?MODULE,
-                        %Stacks,
-                        %MovedStack,
-                        %PrevStacks,
-                        %NewSourceStack,
-                        %OrigTargetStack,
-                        %SourceNumber,
-                        %SourceSuit,
-                        %TargetNumber,
-                        %TargetSuit,
-                        %AreSequential,
-                        %AreDifferentSuits,
-                        %IsBacktracking,
-                        %IsOnlyNumbers,
-                        %IsInOrder,
-                        %HasAlternatingSuits]),
                 AreSequential andalso AreDifferentSuits
         end,
 

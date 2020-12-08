@@ -24,26 +24,22 @@
 
 all() ->
     [test_stack_to_stack_moves,
-     test_get_orig_target_stack].
-
-%all() ->
-%    [test_stack_to_stack_moves,
-%     test_remove_substack,
-%     test_cards_to_free_moves,
-%     test_slay_dragon_moves,
-%     test_visible_dragons,
-%     test_maybe_slay_dragon,
-%     test_has_empty_free_cell,
-%     test_has_matching_free_cell_dragon,
-%     test_dragon_free_cells,
-%     test_add_dragon,
-%     test_slay_dragon,
-%     test_remove_dragon,
-%     test_is_valid_stack_move,
-%     test_get_orig_target_stack,
-%     test_remove_stack,
-%     test_has_alternating_suits,
-%     test_substacks].
+     test_remove_substack,
+     test_cards_to_free_moves,
+     test_slay_dragon_moves,
+     test_visible_dragons,
+     test_maybe_slay_dragon,
+     test_has_empty_free_cell,
+     test_has_matching_free_cell_dragon,
+     test_dragon_free_cells,
+     test_add_dragon,
+     test_slay_dragon,
+     test_remove_dragon,
+     test_is_valid_stack_move,
+     test_get_orig_target_stack,
+     test_remove_stack,
+     test_has_alternating_suits,
+     test_substacks].
 
 %% TODO test filtering out backtracking moves
 test_stack_to_stack_moves(_Config) ->
@@ -59,8 +55,6 @@ test_stack_to_stack_moves(_Config) ->
           moves => [],
           previous_stacks => Stacks},
 
-    States = ?SS:stack_to_stack_moves(State),
-    ct:pal("~p: States~n\t~p~n", [?MODULE, States]),
 
 	[#{moves := [{[{1,red},{2,green}],'->',{3,black}}],
            previous_stacks :=
@@ -83,7 +77,7 @@ test_stack_to_stack_moves(_Config) ->
                [[],
                 [{3,black},{4,red},{5,green},{6,black},{7,red},{8,green}],
                 [{1,red},{2,green},{9,black}]]}]
-        = States.
+        = ?SS:stack_to_stack_moves(State).
 
 
 test_remove_substack(_Config) ->
@@ -379,69 +373,78 @@ test_is_valid_stack_move(_Config) ->
         {[single_card], '->', {free, 1}},
     State1 = #{moves => [MoveSingleCardToEmptyFreeCell],
                {free, 1} => empty},
-    true = ?SS:is_valid_stack_move(State1),
+    true = ?SS:is_valid_stack_move({x, x, State1}),
 
     MoveSingleCardToOccupiedFreeCell =
         {[single_card], '->', {free, 1}},
     State2 = #{moves => [MoveSingleCardToOccupiedFreeCell],
                {free, 1} => a_card},
-    false = ?SS:is_valid_stack_move(State2),
+    false = ?SS:is_valid_stack_move({x, x, State2}),
 
     MoveMultipleCardsToFreeCell =
         {[card1, card2], '->', {free, 1}},
     State3 = #{moves => [MoveMultipleCardsToFreeCell],
                {free, 1} => empty},
-    false = ?SS:is_valid_stack_move(State3),
+    false = ?SS:is_valid_stack_move({x, x, State3}),
 
     Move1ToEmptyFinishedCell = {[{1, red}], '->', {finished, red}},
     State4 = #{moves => [Move1ToEmptyFinishedCell],
                {finished, red} => []},
-    true = ?SS:is_valid_stack_move(State4),
+    true = ?SS:is_valid_stack_move({x, x, State4}),
 
     MoveNot1ToEmptyFinishedCell = {[{2, red}], '->', {finished, red}},
     State5 = #{moves => [MoveNot1ToEmptyFinishedCell],
                {finished, red} => []},
-    false = ?SS:is_valid_stack_move(State5),
+    false = ?SS:is_valid_stack_move({x, x, State5}),
 
     MoveNextTo1FinishedCell = {[{2, red}], '->', {finished, red}},
     State6 = #{moves => [MoveNextTo1FinishedCell],
                {finished, red} => [{1, red}]},
-    true = ?SS:is_valid_stack_move(State6),
+    true = ?SS:is_valid_stack_move({x, x, State6}),
 
     MoveOutOfOrderToFinishedCell = {[{4, red}], '->', {finished, red}},
     State7 = #{moves => [MoveOutOfOrderToFinishedCell],
                {finished, red} => [{2, red}, {1, red}]},
-    false = ?SS:is_valid_stack_move(State7),
+    false = ?SS:is_valid_stack_move({x, x, State7}),
 
     MoveWrongSuitToEmptyFinished = {[{1, red}], '->', {finished, green}},
     State8 = #{moves => [MoveWrongSuitToEmptyFinished],
                {finished, red} => []},
-    false = ?SS:is_valid_stack_move(State8),
+    false = ?SS:is_valid_stack_move({x, x, State8}),
 
     MoveWrongSuitNextToFinished = {[{2, red}], '->', {finished, green}},
     State9 = #{moves => [MoveWrongSuitNextToFinished],
                {finished, red} => [{1, green}]},
-    false = ?SS:is_valid_stack_move(State9),
+    false = ?SS:is_valid_stack_move({x, x, State9}),
 
     MoveDragonToFinished = {[{dragon, 1}], '->', {finished, green}},
     State10 = #{moves => [MoveDragonToFinished],
                {finished, red} => []},
-    false = ?SS:is_valid_stack_move(State10),
+    false = ?SS:is_valid_stack_move({x, x, State10}),
 
+    %% TODO fixme: pass in original previous_stacks as separate arg
+    %%             as well as the updated source stack (i.e. minus
+    %%             the moved stack)
     RepeatedStack = [{dragon, 1}, {1, red}, {9, green}],
     DummyMove = {[{1, red}], '->', [{2, green}]},
     State11 = #{moves => [DummyMove],
                 stacks => [[{1, red}, {9, black}],
                            RepeatedStack],
                 previous_stacks => [[{dragon, 1}, {1, red}, {9, green}]]},
-    false = ?SS:is_valid_stack_move(State11),
+    false = ?SS:is_valid_stack_move({State11),
 
+    %% TODO fixme: pass in original previous_stacks as separate arg
+    %%             as well as the updated source stack (i.e. minus
+    %%             the moved stack)
     MoveStackWithDragon = {[{1, green}, {dragon, 1}], '->', [{3, green}]},
     State12 = #{moves => [MoveStackWithDragon],
                 stacks => [[{1, green}, {dragon, 1}, {7, green}]],
                 previous_stacks => []},
     false = ?SS:is_valid_stack_move(State12),
 
+    %% TODO fixme: pass in original previous_stacks as separate arg
+    %%             as well as the updated source stack (i.e. minus
+    %%             the moved stack)
     MoveOutOfOrderStack = {[{5, green}, {3, red}], '->', [{6, black}]},
     State13 = #{moves => [MoveOutOfOrderStack],
                 stacks => [[{5, green}, {3, red}, {8, red}],
@@ -449,6 +452,9 @@ test_is_valid_stack_move(_Config) ->
                 previous_stacks => []},
     false = ?SS:is_valid_stack_move(State13),
 
+    %% TODO fixme: pass in original previous_stacks as separate arg
+    %%             as well as the updated source stack (i.e. minus
+    %%             the moved stack)
     MoveNonAlternatingSuitStack = {[{2, green}, {3, green}], '->', [{4, black}]},
     State14 = #{moves => [MoveNonAlternatingSuitStack],
                 stacks => [[{5, green}, {3, red}, {8, red}],
@@ -456,6 +462,9 @@ test_is_valid_stack_move(_Config) ->
                 previous_stacks => []},
     false = ?SS:is_valid_stack_move(State14),
 
+    %% TODO fixme: pass in original previous_stacks as separate arg
+    %%             as well as the updated source stack (i.e. minus
+    %%             the moved stack)
     MoveStackToDragon = {[{2, green}, {3, green}], '->', [{dragon, 2}]},
     State15 = #{moves => [MoveStackToDragon],
                 stacks => [[{5, green}, {3, red}, {8, red}],
@@ -463,6 +472,9 @@ test_is_valid_stack_move(_Config) ->
                 previous_stacks => []},
     false = ?SS:is_valid_stack_move(State15),
 
+    %% TODO fixme: pass in original previous_stacks as separate arg
+    %%             as well as the updated source stack (i.e. minus
+    %%             the moved stack)
     MoveStackNonSequentially = {[{2, black}, {3, green}], '->', [{5, red}]},
     State16 = #{moves => [MoveStackNonSequentially],
                 stacks => [[{5, green}, {3, red}, {8, red}],
@@ -470,6 +482,9 @@ test_is_valid_stack_move(_Config) ->
                 previous_stacks => []},
     false = ?SS:is_valid_stack_move(State16),
 
+    %% TODO fixme: pass in original previous_stacks as separate arg
+    %%             as well as the updated source stack (i.e. minus
+    %%             the moved stack)
     MoveStackOntoMatchingSuit = {[{2, black}, {3, green}], '->', [{4, green}]},
     State17 = #{moves => [MoveStackOntoMatchingSuit],
                 stacks => [[{5, green}, {3, red}, {8, red}],
