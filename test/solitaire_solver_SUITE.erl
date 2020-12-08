@@ -46,17 +46,16 @@ test_cards_to_free_moves(_config) ->
                      [{3, green}, {4, red}]],
           moves => []},
 
-	[#{moves := [{{2,black},'->',{free,1}}],
-       stacks := [[],[{3,green},{4,red}]],
-       {free,1} := {2,black},
-       {free,2} := {1,red},
-       {free,3} := empty},
-     #{moves := [{{3,green},'->',{free,1}}],
-       stacks := [[{4,red}],[{2,black}]],
-       {free,1} := {3,green},
-       {free,2} := {1,red},
-       {free,3} := empty}] = lists:sort(?SS:cards_to_free_moves(State)).
-
+	[#{moves := [{{2, black}, '->', free}],
+       stacks := [[], [{3, green}, {4, red}]],
+       {free, 1} := {2, black},
+       {free, 2} := {1, red},
+       {free, 3} := empty},
+     #{moves := [{{3, green}, '->', free}],
+       stacks := [[{4, red}], [{2, black}]],
+       {free, 1} := {3, green},
+       {free, 2} := {1, red},
+       {free, 3} := empty}] = lists:sort(?SS:cards_to_free_moves(State)).
 
 test_slay_dragon_moves(_Config) ->
     StateWithNoSlayableDragons =

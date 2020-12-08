@@ -118,7 +118,7 @@ card_to_free_move({{free, N}, empty},
     NewStacks = [RestOfStack | OtherStacks],
     State#{stacks => NewStacks,
            {free, N} => Card,
-           moves => [{Card, '->', {free, N}} | Moves]};
+           moves => [{Card, '->', free} | Moves]};
 card_to_free_move(_FreeCell, _Stack, _State) ->
     _InvalidMove = [].
 
