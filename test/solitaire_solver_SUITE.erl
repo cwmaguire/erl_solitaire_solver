@@ -2,6 +2,7 @@
 
 -export([all/0]).
 %% I know I could do export_all, but I like this. Sue me. :)
+-export([test_maybe_slay_dragon/1]).
 -export([test_has_empty_free_cell/1]).
 -export([test_has_matching_free_cell_dragon/1]).
 -export([test_dragon_free_cells/1]).
@@ -17,7 +18,8 @@
 -define(SS, solitaire_solver).
 
 all() ->
-    [test_has_empty_free_cell,
+    [test_maybe_slay_dragon,
+     test_has_empty_free_cell,
      test_has_matching_free_cell_dragon,
      test_dragon_free_cells,
      test_add_dragon,
@@ -28,6 +30,61 @@ all() ->
      test_remove_stack,
      test_has_alternating_suits,
      test_substacks].
+
+test_maybe_slay_dragon(_Config) ->
+    StateWithZeroAvailFreeCells
+       = #{stacks => [[{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 2}],
+                      [{green, 9}]],
+           {free, 1} => {dragon, 3},
+           {free, 2} => {1, red},
+           {free, 3} => {dragon, 2},
+           moves => []},
+    [] = ?SS:maybe_slay_dragon(1, StateWithZeroAvailFreeCells),
+
+    StateWithEmptyFreeCell
+       = #{stacks => [[{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 2}],
+                      [{green, 9}]],
+           {free, 1} => empty,
+           {free, 2} => {1, red},
+           {free, 3} => {dragon, 2},
+           moves => []},
+    #{{free, 1} := {slayed_dragon, 1},
+      {free, 2} := {1, red},
+      {free, 3} := {dragon, 2},
+      stacks := Stacks1,
+      moves := [{slay, 1}]} =
+        ?SS:maybe_slay_dragon(1, StateWithEmptyFreeCell),
+
+    [[], [], [], [], [{dragon, 2}], [{green, 9}]] = lists:sort(Stacks1),
+
+    StateWithFreeCellMatchingDragon
+       = #{stacks => [[{1, red}],
+                      [{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 1}],
+                      [{dragon, 2}],
+                      [{9, green}]],
+           {free, 1} => {dragon, 1},
+           {free, 2} => {1, red},
+           {free, 3} => {dragon, 2},
+           moves => []},
+    #{{free, 1} := {slayed_dragon, 1},
+      {free, 2} := {1, red},
+      {free, 3} := {dragon, 2},
+      stacks := Stacks2,
+      moves := [{slay, 1}]} =
+        ?SS:maybe_slay_dragon(1, StateWithFreeCellMatchingDragon),
+
+    [[], [], [], [{1, red}], [{9, green}], [{dragon, 2}]] =
+        lists:sort(Stacks2).
 
 test_has_empty_free_cell(_Config) ->
     false = ?SS:has_empty_free_cell(#{{free, 1} => {1, red}}),
