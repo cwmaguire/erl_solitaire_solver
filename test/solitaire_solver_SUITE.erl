@@ -2,6 +2,8 @@
 
 -export([all/0]).
 %% I know I could do export_all, but I like this. Sue me. :)
+-export([test_stack_to_stack_moves/1]).
+-export([test_remove_substack/1]).
 -export([test_cards_to_free_moves/1]).
 -export([test_slay_dragon_moves/1]).
 -export([test_visible_dragons/1]).
@@ -21,21 +23,76 @@
 -define(SS, solitaire_solver).
 
 all() ->
-    [test_cards_to_free_moves,
-     test_slay_dragon_moves,
-     test_visible_dragons,
-     test_maybe_slay_dragon,
-     test_has_empty_free_cell,
-     test_has_matching_free_cell_dragon,
-     test_dragon_free_cells,
-     test_add_dragon,
-     test_slay_dragon,
-     test_remove_dragon,
-     test_is_valid_stack_move,
-     test_get_orig_target_stack,
-     test_remove_stack,
-     test_has_alternating_suits,
-     test_substacks].
+    [test_stack_to_stack_moves,
+     test_get_orig_target_stack].
+
+%all() ->
+%    [test_stack_to_stack_moves,
+%     test_remove_substack,
+%     test_cards_to_free_moves,
+%     test_slay_dragon_moves,
+%     test_visible_dragons,
+%     test_maybe_slay_dragon,
+%     test_has_empty_free_cell,
+%     test_has_matching_free_cell_dragon,
+%     test_dragon_free_cells,
+%     test_add_dragon,
+%     test_slay_dragon,
+%     test_remove_dragon,
+%     test_is_valid_stack_move,
+%     test_get_orig_target_stack,
+%     test_remove_stack,
+%     test_has_alternating_suits,
+%     test_substacks].
+
+%% TODO test filtering out backtracking moves
+test_stack_to_stack_moves(_Config) ->
+    %dbg:tracer(),
+    %dbg:p(all, call),
+    %dbg:tpl(solitaire_solver, is_valid_stack_move, [{'_', [], [{return_trace}]}]),
+    %dbg:tpl(solitaire_solver, stack_to_stack_moves_, [{'_', [], [{return_trace}]}]),
+    Stacks = [[{1, red}, {2, green}, {9, black}],
+              [{3, black}, {4, red}, {5, green}],
+              [{6, black}, {7, red}, {8, green}]],
+    State =
+        #{stacks => Stacks,
+          moves => [],
+          previous_stacks => Stacks},
+
+    States = ?SS:stack_to_stack_moves(State),
+    ct:pal("~p: States~n\t~p~n", [?MODULE, States]),
+
+	[#{moves := [{[{1,red},{2,green}],'->',{3,black}}],
+           previous_stacks :=
+               [[{9,black}],
+                [{1,red},{2,green},{3,black},{4,red},{5,green}],
+                [{1,red},{2,green},{9,black}],
+                [{3,black},{4,red},{5,green}],
+                [{6,black},{7,red},{8,green}]],
+           stacks :=
+               [[{9,black}],
+                [{1,red},{2,green},{3,black},{4,red},{5,green}],
+                [{6,black},{7,red},{8,green}]]},
+         #{moves := [{[{3,black},{4,red},{5,green}],'->',{6,black}}],
+           previous_stacks :=
+               [[{3,black},{4,red},{5,green},{6,black},{7,red},{8,green}],
+                [{1,red},{2,green},{9,black}],
+                [{3,black},{4,red},{5,green}],
+                [{6,black},{7,red},{8,green}]],
+           stacks :=
+               [[],
+                [{3,black},{4,red},{5,green},{6,black},{7,red},{8,green}],
+                [{1,red},{2,green},{9,black}]]}]
+        = States.
+
+
+test_remove_substack(_Config) ->
+    Stacks = [[{1, red}, {2, green}],
+              [{3, black}, {4, red}, {5, green}],
+              [{6, black}, {7, red}, {8, green}]],
+    [{5, green}] = ?SS:remove_substack([{3, black}, {4, red}], Stacks),
+    [{4, red}, {5, green}] = ?SS:remove_substack([{3, black}], Stacks),
+    [] = ?SS:remove_substack([{1, red}, {2, green}], Stacks).
 
 test_cards_to_free_moves(_config) ->
     State =
@@ -80,8 +137,8 @@ test_slay_dragon_moves(_Config) ->
                      [{dragon, 1}],
                      [{2, red}]],
           moves => []},
-    [State = #{{free, 1} := Free1,
-               {free, 2} := Free2,
+    [State = #{{free, 1} := _,
+               {free, 2} := __,
                stacks := Stacks,
                moves := [{slay, 1}]}] =
         ?SS:slay_dragon_moves(StateWithOneSlayableDragons2),
@@ -427,7 +484,8 @@ test_get_orig_target_stack(_Config) ->
               [2, 3, 4],
               [1, 2],
               [3, 1, 2]],
-    [1, 2, 3, 4, 5, 6] = ?SS:get_orig_target_stack([1, 2, 3], Stacks).
+    MovedStack = [1, 2, 3],
+    [4, 5, 6] = ?SS:get_orig_target_stack(MovedStack, Stacks).
 
 test_remove_stack(_Config) ->
     [] = ?SS:remove_stack([], []),
