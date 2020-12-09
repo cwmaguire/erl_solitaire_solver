@@ -26,7 +26,7 @@
 
 -define(SS, solitaire_solver).
 all() ->
-    [test_is_solved].
+    [test_solve].
 
 % all() ->
 %     [test_solve,
@@ -107,7 +107,11 @@ test_solve(_Config) ->
     ct:pal("~p: MoveLists~n\t~p~n", [?MODULE, MoveLists]).
 
 test_is_solved(_Config) ->
-    ok.
+    State1 = #{stacks => [[], [], [], []]},
+    State2 = #{stacks => [[{1, red}], [], [], []]},
+
+    true = ?SS:is_solved(State1),
+    false = ?SS:is_solved(State2).
 
 test_poppy_move(_Config) ->
     NewStacks =

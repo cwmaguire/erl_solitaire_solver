@@ -16,16 +16,23 @@ solve(Cards) ->
             previous_stacks => Stacks,
             finished => Finished,
             moves => []},
-  solve_([State], 3).
+  solve_([State], 10).
 
 solve_(_, 0) ->
     <<"Exhausted 10 rounds">>;
 solve_([State | Rest] = States, Rounds) ->
+    ct:pal("~p: Rounds~n\t~p~n", [?MODULE, Rounds]),
     case lists:filter(fun is_solved/1, States) of
-        [{solved, _Moves} | _] = Solutions ->
-            Solutions;
+        [#{moves := Moves} | _] ->
+            lists:reverse(Moves);
         _ ->
-            solve_(Rest ++ move(State), Rounds - 1)
+            NewStates = move(State),
+
+            StateParts = [maps:with([moves], S) || S <- NewStates],
+            ct:pal("~p: NewStates~n\t~p~n", [?MODULE, StateParts]),
+            %ct:pal("~p: NewMoves~n\t~p~n", [?MODULE, NewMoves]),
+
+            solve_(Rest ++ NewStates, Rounds - 1)
     end.
 
 stacks([]) ->
@@ -53,15 +60,24 @@ is_stack_empty([_ | _]) ->
 
 % TODO automatically just delete a visible poppy
 move(State) ->
+    StackToStack = stack_to_stack_moves(State),
     NewStates =
-        [stack_to_stack_moves(State),
+        [StackToStack,
          cards_to_free_moves(State),
          free_to_stack_moves(State),
          cards_to_finish_moves(State),
          slay_dragon_moves(State),
          poppy_move(State)],
     FlattenedNewStates = lists:flatten(NewStates),
-    ct:pal("~p: NewStates~n\t~p~n", [?MODULE, FlattenedNewStates]),
+
+    StateParts = [maps:with([moves], S) || S <- FlattenedNewStates],
+    ct:pal("~p: FlattenedNewStates~n\t~p~n", [?MODULE, StateParts]),
+
+    %StateParts = [maps:with([moves], S) || S <- FlattenedNewStates],
+
+    StateParts2 = [maps:with([moves], S) || S <- StackToStack],
+    ct:pal("~p: StackToStack~n\t~p~n", [?MODULE, StateParts2]),
+
     FlattenedNewStates.
 
 
@@ -101,6 +117,19 @@ stack_to_stack_moves_({{SubStack, RestOfStack}, OtherStacks, State}) ->
         [{PrevStacks, NewSourceStack, State_} || {NewSourceStack, State_} <- NewStates],
     ValidMovesPlusPrevStacks =
         lists:filter(fun is_valid_stack_move/1, FilterableStates),
+
+    %Filterable = [State || {_, _, State} <- FilterableStates],
+    %Filtered = lists:subtract(Filterable, ValidMovesPlusPrevStacks),
+    %FilteredParts = [maps:with([moves], S) || S <- Filtered],
+    %ct:pal("~p: FilteredParts~n\t~p~n", [?MODULE, FilteredParts]),
+
+    %FilterableStateParts = [maps:with([moves], S) || S <- FilterableStates],
+    %ct:pal("~p: FilterableStateParts~n\t~p~n", [?MODULE, FilterableStateParts]),
+
+    %Valid = [State || {_, _, State} <- ValidMovesPlusPrevStacks],
+    %ValidParts = [maps:with([moves], S) || S <- Valid],
+    %ct:pal("~p: RemainingParts~n\t~p~n", [?MODULE, ValidParts]),
+
     [ValidState || {_, _, ValidState} <- ValidMovesPlusPrevStacks].
 
 stack_to_stack_move(SubStack,
@@ -147,12 +176,14 @@ cards_to_free_moves(#{stacks := Stacks} = State) ->
 card_to_free_move({{free, N}, empty},
                    [Card | RestOfStack] = Stack,
                    #{stacks := Stacks,
-                     moves := Moves} = State) ->
+                     moves := Moves,
+                     previous_stacks := PrevStacks} = State) ->
     OtherStacks = lists:delete(Stack, Stacks),
     NewStacks = [RestOfStack | OtherStacks],
     State#{stacks => NewStacks,
            {free, N} => Card,
-           moves => [{Card, '->', free} | Moves]};
+           moves => [{Card, '->', free} | Moves],
+           previous_stacks => [RestOfStack | PrevStacks]};
 card_to_free_move(_FreeCell, _Stack, _State) ->
     _InvalidMove = [].
 
@@ -167,12 +198,14 @@ free_to_stack_moves_(FreeCell, #{stacks := Stacks} = State) ->
 free_to_stack_move({{free, Suit}, Card},
                    Stack,
                    #{stacks := Stacks,
-                     moves := Moves} = State) ->
+                     moves := Moves,
+                     previous_stacks := PrevStacks} = State) ->
     OtherStacks = lists:delete(Stack, Stacks),
     NewStack = [Card | Stack],
     State#{stacks => [NewStack | OtherStacks],
            {free, Suit} => empty,
-           moves => [{Card, '->', hd(Stack)} | Moves]}.
+           moves => [{Card, '->', hd(Stack)} | Moves],
+           previous_stacks => [NewStack | PrevStacks]}.
 
 cards_to_finish_moves(#{stacks := Stacks} = State) ->
     FinishCells = [FC || FC = {{finish, _}, _Cards} <- maps:to_list(State)],
@@ -183,7 +216,8 @@ card_to_finish_move({{finish, Suit},
                      [{FinNum, Suit} | _ ] = FinishStack},
                    [{CardNum, Suit} = TopStackCard | RestOfStack] = Stack,
                    #{stacks := Stacks,
-                     moves := Moves} = State)
+                     moves := Moves,
+                     previous_stacks := PrevStacks} = State)
         when FinNum == empty, CardNum == 1;
              CardNum == FinNum + 1 ->
     OtherStacks = lists:delete(Stack, Stacks),
@@ -191,7 +225,8 @@ card_to_finish_move({{finish, Suit},
     NewFinishStack = [TopStackCard | FinishStack],
     State#{stacks => NewStacks,
            {finish, Suit} => NewFinishStack,
-           moves => [{TopStackCard, '->', finish} | Moves]};
+           moves => [{TopStackCard, '->', finish} | Moves],
+           previous_stacks => [RestOfStack | PrevStacks]};
 card_to_finish_move(_FreeCell, _Stack, _State) ->
     _InvalidMove = [].
 
@@ -245,7 +280,8 @@ add_dragon(_NotDragon, Counts) ->
 %%     seen twice since it won't have been recorded when it came
 %%     into existence
 slay_dragon(DragonNum, #{stacks := Stacks,
-                         moves := Moves} = State) ->
+                         moves := Moves,
+                         previous_stacks := PrevStacks} = State) ->
     {{free, DragonFreeCellNumber}, _} =
         case dragon_free_cells(DragonNum, State) of
             [] ->
@@ -260,9 +296,12 @@ slay_dragon(DragonNum, #{stacks := Stacks,
                                      DragonNum == DN],
     StacksWithDragons =
         [S || S = [{dragon, DN} | _] <- Stacks, DragonNum == DN],
+    NewStacks =
+        [Rest || [{dragon, DN} | Rest] <- Stacks, DragonNum == DN],
     State2 = lists:foldl(fun remove_dragon/2, State, OtherDragonFreeCells ++ StacksWithDragons),
     State2#{{free, DragonFreeCellNumber} => {slayed_dragon, DragonNum},
-            moves => [{slay, DragonNum} | Moves]}.
+            moves => [{slay, DragonNum} | Moves],
+            previous_stacks => PrevStacks ++ NewStacks}.
 
 remove_dragon([{dragon, _DragonNum} | StackTail] = Stack,
               #{stacks := Stacks} = State) ->
@@ -332,13 +371,19 @@ is_valid_stack_move({_, _, #{moves := [{MovedStack, '->', _} | _]}} = StackMove)
 
 is_valid_stack_move_({PrevStacks,
                       NewSourceStack,
-                      #{moves := [{MovedStack, '->', _} | _],
+                      #{moves := [{MovedStack, '->', Target} | _],
                         stacks := Stacks} = _State}) ->
     OrigTargetStack = get_orig_target_stack(MovedStack, Stacks),
     UpdatedTargetStack = MovedStack ++ OrigTargetStack,
     ModifiedStacks = [NewSourceStack, UpdatedTargetStack],
     IsBackTrackingFun = fun(Stack) -> lists:member(Stack, ModifiedStacks) end,
-    IsBacktracking = lists:any(IsBackTrackingFun, PrevStacks),
+    IsBacktracking =
+        case Target of
+            {finish, _} ->
+                _IsBacktrackingToFinishACard = false;
+            _ ->
+                lists:any(IsBackTrackingFun, PrevStacks)
+        end,
     Numbers = [N || {N, _Suit} <- MovedStack],
     IsInOrder = (Numbers == lists:sort(Numbers)),
     HasAlternatingSuits = has_alternating_suits(MovedStack),
@@ -387,8 +432,9 @@ has_alternating_suits([_ | Rest]) ->
 sub_stacks([]) ->
     [];
 sub_stacks(Stack) ->
-    SubStacks = [{Stack, []}],
-    sub_stacks(Stack, SubStacks, _RestOfStack = []).
+    InitSubStacks = [{Stack, []}],
+    SubStacks = sub_stacks(Stack, InitSubStacks, _RestOfStack = []),
+    lists:filter(fun is_valid/1, SubStacks).
 
 sub_stacks([_], SubStacks, _) ->
     SubStacks;
@@ -397,3 +443,44 @@ sub_stacks(Stack, SubStacks, Rest) ->
     AllButLast = lists:delete(Last, Stack),
     RestOfStack = [Last | Rest],
     sub_stacks(AllButLast, [{AllButLast, RestOfStack} | SubStacks], RestOfStack).
+
+is_valid({[{dragon, _} | _], _}) ->
+    false;
+is_valid([{poppy} | _]) ->
+    false;
+is_valid({SubStack, _}) ->
+    NumCards = length(SubStack),
+    NumNumbers = length([N || {N, _} <- SubStack, is_integer(N)]),
+    case NumCards == NumNumbers of
+        true ->
+            is_in_order(SubStack);
+        false ->
+            false
+    end.
+
+is_in_order(SubStack) ->
+    Numbers = [N || {N, _} <- SubStack, is_integer(N)],
+    case lists:sort(Numbers) == Numbers of
+        true ->
+            has_subsequent_numbers(SubStack);
+        false ->
+            false
+    end.
+
+has_subsequent_numbers(SubStack) ->
+    has_subsequent_numbers(SubStack, SubStack).
+
+has_subsequent_numbers([_], SubStack) ->
+    has_alternating_colours(SubStack);
+has_subsequent_numbers([{X, _} | [{Y, _} | _] = Rest], SubStack)
+        when (X + 1) == Y ->
+    has_subsequent_numbers(Rest, SubStack);
+has_subsequent_numbers(_, _) ->
+    false.
+
+has_alternating_colours([_]) ->
+    true;
+has_alternating_colours([{_, C}, {_, C} | _]) ->
+    false;
+has_alternating_colours([_ | Rest]) ->
+    has_alternating_colours(Rest).
