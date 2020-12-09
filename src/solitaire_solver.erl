@@ -289,7 +289,7 @@ is_valid_stack_move({PrevStacks,
     IsInOrder = (MaybeNumbers == lists:sort(MaybeNumbers)),
     HasAlternatingSuits = has_alternating_suits(MovedStack),
     {SourceNumber, SourceSuit} = _BottomMoved = lists:last(MovedStack),
-    AreStacksCompatible =
+    AreStacksCompatible = IsOnlyNumbers andalso
         case OrigTargetStack of
             [] ->
                 _CanMoveStackIntoEmptyStackSpace =
@@ -298,7 +298,8 @@ is_valid_stack_move({PrevStacks,
                 _CanMoveStackOntoDragon =
                     false;
             [{TargetNumber, TargetSuit} = _OldTop | _] ->
-                AreSequential = (SourceNumber + 1 == TargetNumber),
+                AreSequential = is_integer(SourceNumber) andalso
+                                (SourceNumber + 1 == TargetNumber),
                 AreDifferentSuits = (SourceSuit /= TargetSuit),
                 AreSequential andalso AreDifferentSuits
         end,
