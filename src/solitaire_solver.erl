@@ -9,18 +9,23 @@
 solve(Cards) ->
   Stacks = stacks(Cards),
   Finished = [[] || _ <- lists:seq(1, 4)],
-  State = #{free => [],
+  State = #{{free, 1} => empty,
+            {free, 2} => empty,
+            {free, 3} => empty,
             stacks => Stacks,
             previous_stacks => Stacks,
-            finished => Finished},
-  solve_([State]).
+            finished => Finished,
+            moves => []},
+  solve_([State], 3).
 
-solve_([State | Rest] = States) ->
+solve_(_, 0) ->
+    <<"Exhausted 10 rounds">>;
+solve_([State | Rest] = States, Rounds) ->
     case lists:filter(fun is_solved/1, States) of
         [{solved, _Moves} | _] = Solutions ->
             Solutions;
         _ ->
-            solve_(Rest ++ move(State))
+            solve_(Rest ++ move(State), Rounds - 1)
     end.
 
 stacks([]) ->
@@ -46,6 +51,7 @@ is_stack_empty([_ | _]) ->
 % is_slayed_dragon(_) ->
 %     false.
 
+% TODO automatically just delete a visible poppy
 move(State) ->
     NewStates =
         [stack_to_stack_moves(State),
@@ -53,52 +59,57 @@ move(State) ->
          free_to_stack_moves(State),
          cards_to_finish_moves(State),
          slay_dragon_moves(State),
-         poppy_moves(State)],
-    lists:flatten(NewStates).
+         poppy_move(State)],
+    FlattenedNewStates = lists:flatten(NewStates),
+    ct:pal("~p: NewStates~n\t~p~n", [?MODULE, FlattenedNewStates]),
+    FlattenedNewStates.
 
 
 stack_to_stack_moves(State) when is_map(State) ->
-    SubstackMoves = lists:flatten(substack_move_list_lists(State)),
-    lists:flatten([stack_to_stack_moves(List) || List <- SubstackMoves]);
+    MultiSubStacks = multi_substacks(State),
+    %ct:pal("~p: SubstackMoves~n\t~p~n", [?MODULE, SubstackMoves]),
+    lists:flatten([stack_to_stack_moves(MS) || MS <- MultiSubStacks]);
 
-stack_to_stack_moves({SubStacks, OtherStacks, State}) ->
+stack_to_stack_moves({SubStacks, OtherStacks, State} = _Substack) ->
     SubStackStates = [{SubStack, OtherStacks, State} || SubStack <- SubStacks],
     lists:map(fun stack_to_stack_moves_/1, SubStackStates).
 
-stack_to_stack_moves_({SubStack, OtherStacks, State}) ->
+%% TODO I could return the original stack too, which would make things easier later:
+%%      I wouldn't have to find the original stack to remove the substack
+%%      from it.
+multi_substacks(#{stacks := Stacks} = State) ->
+    SubStackFun =
+        fun(Stack) ->
+                OtherStacks = lists:delete(Stack, Stacks),
+                {sub_stacks(Stack), OtherStacks, State}
+        end,
+    lists:flatten(lists:map(SubStackFun, Stacks)).
+
+stack_to_stack_moves_({{SubStack, RestOfStack}, OtherStacks, State}) ->
     #{previous_stacks := PrevStacks} = State,
+    %ct:pal("SubStack: ~p~nRestOfStack: ~p~nOtherStacks: ~p~nState: ~p~n",
+           %[SubStack, RestOfStack, OtherStacks, State]),
     NewStates =
         [stack_to_stack_move(SubStack,
+                             RestOfStack,
                              OtherStack,
                              _RestOfOther =
                                  lists:delete(OtherStack, OtherStacks),
                              State)
          || OtherStack <- OtherStacks],
     FilterableStates =
-        [{PrevStacks, NewSourceStack, State} || {NewSourceStack, State} <- NewStates],
+        [{PrevStacks, NewSourceStack, State_} || {NewSourceStack, State_} <- NewStates],
     ValidMovesPlusPrevStacks =
         lists:filter(fun is_valid_stack_move/1, FilterableStates),
     [ValidState || {_, _, ValidState} <- ValidMovesPlusPrevStacks].
 
-
-%% TODO I could return the original stack too, which would make things easier later:
-%%      I wouldn't have to find the original stack to remove the substack
-%%      from it. I could also pass in the old stack minus the sub stack
-substack_move_list_lists(#{stacks := Stacks} = State) ->
-    SubStackFun =
-        fun(Stack) ->
-                OtherStacks = lists:delete(Stack, Stacks),
-                {sub_stacks(Stack), OtherStacks, State}
-        end,
-    lists:map(SubStackFun, Stacks).
-
 stack_to_stack_move(SubStack,
+                    NewSourceStack,
                     OtherStack,
                     RestOfStacks,
                     #{stacks := Stacks,
                       moves := Moves,
                       previous_stacks := PrevStacks} = State) ->
-    NewSourceStack = remove_substack(SubStack, Stacks),
     NewTargetStack = SubStack ++ OtherStack,
     NewStacks = [NewSourceStack, NewTargetStack | RestOfStacks],
     PrevStacks1 =
@@ -108,7 +119,13 @@ stack_to_stack_move(SubStack,
             _ ->
                 [NewSourceStack, NewTargetStack | PrevStacks]
         end,
-    Move = {SubStack, '->', hd(OtherStack)},
+    Move =
+        case OtherStack of
+            [] ->
+                {SubStack, '->', _MoveToEmptyStack = []};
+            [TopOfTargetStack | _] ->
+                {SubStack, '->', TopOfTargetStack}
+        end,
     {NewSourceStack,
      State#{moves => [Move | Moves],
             previous_stacks => PrevStacks1,
@@ -120,8 +137,12 @@ remove_substack(SubStack, [_ | Stacks]) ->
     remove_substack(SubStack, Stacks).
 
 cards_to_free_moves(#{stacks := Stacks} = State) ->
-    [EmptyFreeCell | _] = [FC || FC = {{free, _}, empty} <- maps:to_list(State)],
-    [card_to_free_move(EmptyFreeCell, Stack, State) || Stack <- Stacks].
+    case [FC || FC = {{free, _}, empty} <- maps:to_list(State)] of
+        [EmptyFreeCell | _] ->
+            [card_to_free_move(EmptyFreeCell, Stack, State) || Stack <- Stacks];
+        [] ->
+            []
+    end.
 
 card_to_free_move({{free, N}, empty},
                    [Card | RestOfStack] = Stack,
@@ -253,17 +274,15 @@ remove_dragon({{free, N}, _}, State) ->
 poppy_move(#{stacks := Stacks,
              moves := Moves,
              previous_stacks := PrevStacks} = State) ->
-    IsPoppyVisible =
-        lists:any(fun is_poppy_visible/1, Stacks),
-    case [S || [{poppy} | _] = S <- Stacks of
-        [{poppy} | NewStack] = PoppyStack ->
+    case [S || [{poppy} | _] = S <- Stacks] of
+        [[{poppy} | NewStack] = PoppyStack] ->
             Move = {[{poppy}], '->', {poppy}},
             NewPrevStacks = [NewStack | PrevStacks],
             NewStacks = [NewStack | lists:delete(PoppyStack, Stacks)],
-            #{stacks => NewStacks,
-              moves => [Move | Moves],
-              previous_stacks => NewPrevStacks};
-        false ->
+            State#{stacks => NewStacks,
+                   moves => [Move | Moves],
+                   previous_stacks => NewPrevStacks};
+        [] ->
             []
     end.
 
@@ -300,38 +319,48 @@ is_valid_stack_move({_, _, #{moves := [{[{dragon, _}] = _SingleCard,
                                         {finished, _}}  | _]} = _State}) ->
     _CanPutDragonInFinishedPile =
         false;
-is_valid_stack_move({PrevStacks,
-                     NewSourceStack,
-                     #{moves := [{MovedStack, '->', _} | _],
-                       stacks := Stacks} = _State}) ->
+is_valid_stack_move({_, _, #{moves := [{MovedStack, '->', _} | _]}} = StackMove) ->
+    NumPoppies = length([P || {poppy} = P <- MovedStack]),
+    NumDragons = length([D || {dragon, _} = D <- MovedStack]),
+    case {NumPoppies, NumDragons} of
+        {0, 0} ->
+            is_valid_stack_move_(StackMove);
+        _ ->
+            _CanMoveStacksContainingDragonsOrPoppies =
+                false
+    end.
+
+is_valid_stack_move_({PrevStacks,
+                      NewSourceStack,
+                      #{moves := [{MovedStack, '->', _} | _],
+                        stacks := Stacks} = _State}) ->
     OrigTargetStack = get_orig_target_stack(MovedStack, Stacks),
     UpdatedTargetStack = MovedStack ++ OrigTargetStack,
     ModifiedStacks = [NewSourceStack, UpdatedTargetStack],
     IsBackTrackingFun = fun(Stack) -> lists:member(Stack, ModifiedStacks) end,
     IsBacktracking = lists:any(IsBackTrackingFun, PrevStacks),
-
-    MaybeNumbers = [MaybeNumber || {MaybeNumber, _Suit} <- MovedStack],
-    IsOnlyNumbers = lists:all(fun is_integer/1, MaybeNumbers),
-    IsInOrder = (MaybeNumbers == lists:sort(MaybeNumbers)),
+    Numbers = [N || {N, _Suit} <- MovedStack],
+    IsInOrder = (Numbers == lists:sort(Numbers)),
     HasAlternatingSuits = has_alternating_suits(MovedStack),
     {SourceNumber, SourceSuit} = _BottomMoved = lists:last(MovedStack),
-    AreStacksCompatible = IsOnlyNumbers andalso
+    AreStacksCompatible =
         case OrigTargetStack of
             [] ->
                 _CanMoveStackIntoEmptyStackSpace =
                     true;
+            [{poppy} = _OldTop | _] ->
+                _CanMoveStackOntoPoppy =
+                    false;
             [{dragon, _} = _OldTop | _] ->
                 _CanMoveStackOntoDragon =
                     false;
             [{TargetNumber, TargetSuit} = _OldTop | _] ->
-                AreSequential = is_integer(SourceNumber) andalso
-                                (SourceNumber + 1 == TargetNumber),
+                AreSequential = (SourceNumber + 1 == TargetNumber),
                 AreDifferentSuits = (SourceSuit /= TargetSuit),
                 AreSequential andalso AreDifferentSuits
         end,
 
     not IsBacktracking and
-    IsOnlyNumbers and
         IsInOrder and
         HasAlternatingSuits and
         AreStacksCompatible.
@@ -355,11 +384,16 @@ has_alternating_suits([{_, Suit}, {_, Suit} | _]) ->
 has_alternating_suits([_ | Rest]) ->
     has_alternating_suits(Rest).
 
+sub_stacks([]) ->
+    [];
 sub_stacks(Stack) ->
-    sub_stacks(Stack, []).
+    SubStacks = [{Stack, []}],
+    sub_stacks(Stack, SubStacks, _RestOfStack = []).
 
-sub_stacks([], Stacks) ->
-    Stacks;
-sub_stacks(Stack, Stacks) ->
-    AllButLast = lists:delete(lists:last(Stack), Stack),
-    sub_stacks(AllButLast, [Stack | Stacks]).
+sub_stacks([_], SubStacks, _) ->
+    SubStacks;
+sub_stacks(Stack, SubStacks, Rest) ->
+    Last = lists:last(Stack),
+    AllButLast = lists:delete(Last, Stack),
+    RestOfStack = [Last | Rest],
+    sub_stacks(AllButLast, [{AllButLast, RestOfStack} | SubStacks], RestOfStack).

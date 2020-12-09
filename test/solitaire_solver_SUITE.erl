@@ -2,6 +2,10 @@
 
 -export([all/0]).
 %% I know I could do export_all, but I like this. Sue me. :)
+-export([test_solve/1]).
+-export([test_is_solved/1]).
+-export([test_poppy_move/1]).
+-export([test_multi_substacks/1]).
 -export([test_stack_to_stack_moves/1]).
 -export([test_remove_substack/1]).
 -export([test_cards_to_free_moves/1]).
@@ -21,32 +25,133 @@
 -export([test_has_alternating_suits/1]).
 
 -define(SS, solitaire_solver).
-
 all() ->
-    [test_stack_to_stack_moves,
-     test_remove_substack,
-     test_cards_to_free_moves,
-     test_slay_dragon_moves,
-     test_visible_dragons,
-     test_maybe_slay_dragon,
-     test_has_empty_free_cell,
-     test_has_matching_free_cell_dragon,
-     test_dragon_free_cells,
-     test_add_dragon,
-     test_slay_dragon,
-     test_remove_dragon,
-     test_is_valid_stack_move,
-     test_get_orig_target_stack,
-     test_remove_stack,
-     test_has_alternating_suits,
-     test_substacks].
+    [test_is_solved].
+
+% all() ->
+%     [test_solve,
+%      test_poppy_move,
+%      test_multi_substacks,
+%      test_stack_to_stack_moves,
+%      test_remove_substack,
+%      test_cards_to_free_moves,
+%      test_slay_dragon_moves,
+%      test_visible_dragons,
+%      test_maybe_slay_dragon,
+%      test_has_empty_free_cell,
+%      test_has_matching_free_cell_dragon,
+%      test_dragon_free_cells,
+%      test_add_dragon,
+%      test_slay_dragon,
+%      test_remove_dragon,
+%      test_is_valid_stack_move,
+%      test_get_orig_target_stack,
+%      test_remove_stack,
+%      test_has_alternating_suits,
+%      test_substacks].
+
+% Saving this hear because I don't want to look it up again
+%dbg:tracer(),
+%dbg:p(all, call),
+%dbg:tpl(solitaire_solver, is_valid_stack_move, [{'_', [], [{return_trace}]}]),
+%dbg:tpl(solitaire_solver, stack_to_stack_moves_, [{'_', [], [{return_trace}]}]),
+
+test_solve_mini(_Config) ->
+    Cards = [],
+    MoveLists = ?SS:solve(Cards),
+    ct:pal("~p: MoveLists~n\t~p~n", [?MODULE, MoveLists]).
+
+test_solve(_Config) ->
+    Cards =
+        [[{4, black},
+          {dragon, 1}, % 1 = black
+          {dragon, 2}, % 2 = red
+          {5, green},
+          {2, red}],
+         [{dragon, 1},
+          {dragon, 2},
+          {9, black},
+          {1, green},
+          {dragon, 3}], % 3 = green
+         [{8, green},
+          {1, black},
+          {dragon, 1},
+          {dragon, 3},
+          {6, black}],
+         [{4, green},
+          {7, red},
+          {2, green},
+          {3, black},
+          {4, red}],
+         [{dragon, 3},
+          {1, red},
+          {8, red},
+          {3, red},
+          {dragon, 2}],
+         [{2, black},
+          {3, green},
+          {6, red},
+          {dragon, 3},
+          {dragon, 1}],
+         [{7, green},
+          {dragon, 2},
+          {9, red},
+          {7, black},
+          {6, green}],
+         [{5, red},
+          {9, green},
+          {poppy},
+          {5, black},
+          {8, black}]],
+    MoveLists = ?SS:solve(Cards),
+    ct:pal("~p: MoveLists~n\t~p~n", [?MODULE, MoveLists]).
+
+test_is_solved(_Config) ->
+    ok.
+
+test_poppy_move(_Config) ->
+    NewStacks =
+        [[{9, red}],
+         [{3, black}, {2, black}]],
+    Stacks =
+        [[{poppy}, {9, red}],
+         [{3, black}, {2, black}]],
+    PrevStacks =
+        [[{9, red}],
+         [{poppy}, {9, red}],
+         [{3, black}, {2, black}]],
+    Move = {[{poppy}], '->', {poppy}},
+    State = #{stacks => Stacks,
+              previous_stacks => Stacks,
+              moves => []},
+
+    #{stacks := NewStacks,
+      moves := [Move],
+      previous_stacks := PrevStacks} =
+        ?SS:poppy_move(State).
+
+test_multi_substacks(_Config) ->
+    Stacks = [[a, b, c],
+              [d, e, f],
+              [g, h, i]],
+	SubStacks =
+	    [{[{[a],[b,c]},{[a,b],[c]},{[a,b,c],[]}],
+          [[d,e,f],[g,h,i]],
+          #{stacks => [[a,b,c],[d,e,f],[g,h,i]]}},
+         {[{[d],[e,f]},{[d,e],[f]},{[d,e,f],[]}],
+          [[a,b,c],[g,h,i]],
+          #{stacks => [[a,b,c],[d,e,f],[g,h,i]]}},
+         {[{[g],[h,i]},{[g,h],[i]},{[g,h,i],[]}],
+          [[a,b,c],[d,e,f]],
+          #{stacks => [[a,b,c],[d,e,f],[g,h,i]]}}],
+
+    State = #{stacks => Stacks},
+    X = ?SS:multi_substacks(State),
+    ct:pal("~p: X~n\t~p~n", [?MODULE, X]),
+    SubStacks = ?SS:multi_substacks(State).
 
 %% TODO test filtering out backtracking moves
 test_stack_to_stack_moves(_Config) ->
-    %dbg:tracer(),
-    %dbg:p(all, call),
-    %dbg:tpl(solitaire_solver, is_valid_stack_move, [{'_', [], [{return_trace}]}]),
-    %dbg:tpl(solitaire_solver, stack_to_stack_moves_, [{'_', [], [{return_trace}]}]),
     Stacks = [[{1, red}, {2, green}, {9, black}],
               [{3, black}, {4, red}, {5, green}],
               [{6, black}, {7, red}, {8, green}]],
@@ -587,9 +692,9 @@ test_substacks(_Config) ->
     SubStacks1 = ?SS:sub_stacks(Stack1),
 
     Stack2 = [1],
-    SubStacks2 = [[1]],
+    SubStacks2 = [{[1], []}],
     SubStacks2 = ?SS:sub_stacks(Stack2),
 
     Stack3 = [1, 2],
-    SubStacks3 = [[1], [1, 2]],
+    SubStacks3 = [{[1], [2]}, {[1, 2], []}],
     SubStacks3 = ?SS:sub_stacks(Stack3).
