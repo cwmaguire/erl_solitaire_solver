@@ -52,7 +52,8 @@ move(State) ->
          cards_to_free_moves(State),
          free_to_stack_moves(State),
          cards_to_finish_moves(State),
-         slay_dragon_moves(State)],
+         slay_dragon_moves(State),
+         rose_moves(State)],
     lists:flatten(NewStates).
 
 
@@ -215,6 +216,13 @@ add_dragon({dragon, N}, Counts) ->
 add_dragon(_NotDragon, Counts) ->
     Counts.
 
+%% TODO add previous stacks
+%% ... maybe. I'm not sure if you could go back to a previous
+%%     stack by moving a dragon: you couldn't move it _onto_ the
+%%     stack, so you can't get back to a previous stack
+%%     Oh, but, the new stack with a dragon removed could be
+%%     seen twice since it won't have been recorded when it came
+%%     into existence
 slay_dragon(DragonNum, #{stacks := Stacks,
                          moves := Moves} = State) ->
     {{free, DragonFreeCellNumber}, _} =
@@ -225,11 +233,12 @@ slay_dragon(DragonNum, #{stacks := Stacks,
                 DragonFreeCell
         end,
     OtherDragonFreeCells =
-        [FC || FC = {{free, M}, {dragon, DragonNum_}} <- maps:to_list(State),
-                                                         DragonFreeCellNumber /= M,
-                                                         DragonNum == DragonNum_],
+        [FC || FC = {{free, FN},
+                     {dragon, DN}} <- maps:to_list(State),
+                                     DragonFreeCellNumber /= FN,
+                                     DragonNum == DN],
     StacksWithDragons =
-        [S || S = [{dragon, DragonNum_} | _] <- Stacks, DragonNum == DragonNum_],
+        [S || S = [{dragon, DN} | _] <- Stacks, DragonNum == DN],
     State2 = lists:foldl(fun remove_dragon/2, State, OtherDragonFreeCells ++ StacksWithDragons),
     State2#{{free, DragonFreeCellNumber} => {slayed_dragon, DragonNum},
             moves => [{slay, DragonNum} | Moves]}.
@@ -240,6 +249,80 @@ remove_dragon([{dragon, _DragonNum} | StackTail] = Stack,
     State#{stacks => [StackTail | OtherStacks]};
 remove_dragon({{free, N}, _}, State) ->
     State#{{free, N} => empty}.
+
+rose_moves(#{stacks := Stacks,
+             moves := Moves,
+             previous_stacks := PrevStacks} = State) ->
+    IsRoseVisible =
+        lists:any(fun is_rose_visible/1, Stacks),
+    case IsRoseVisible of
+        true ->
+            [maybe_rose_move_to_empty(State),
+             maybe_rose_move_to_free(State)];
+        false ->
+            []
+    end.
+
+maybe_rose_move_to_empty(#{stacks := Stacks} = State) ->
+    HasEmptyStack = (0 < length([[] || [] <- Stacks])),
+    case HasEmptyStack of
+        true ->
+            rose_move_to_empty(State);
+        false ->
+            []
+    end.
+
+rose_move_to_empty(#{stacks := Stacks,
+                     moves := Moves,
+                     previous_stacks := PrevStacks} = State) ->
+    HasEmptyStack = (0 < length([[] || [] <- Stacks])),
+                [_ | NewStack] =
+                    RoseStack =
+                        [S || [{rose} | _] = S <- Stacks],
+                Move = {[{rose}], '->', []},
+                NewPrevStacks = [NewStack | PrevStacks],
+                NewStacks = [[{rose}],
+                             NewStack |
+                                 lists:delete(RoseStack,
+                                              lists:delete([],
+                                                           Stacks))],
+                #{stacks => NewStacks,
+                  moves => [Move | Moves],
+                  previous_stacks => NewPrevStacks}
+            false ->
+                []
+        end,
+
+maybe_rose_move_to_free(#{stacks := Stacks,
+                          moves := Moves,
+                          previous_stacks := PrevStacks} = State) ->
+    EmptyFreeCells = [N || {{free, N}, empty} <- maps:to_list(State)],
+    case EmptyFreeCells of
+        [{{free, N}, empty} | _] ->
+            rose_move_to_empty(State, N);
+        false ->
+            []
+    end.
+
+rose_move_to_free(#{stacks := Stacks,
+                    moves := Moves,
+                    previous_stacks := PrevStacks} = State,
+                  FreeNum) ->
+        [_ | NewStack] =
+            RoseStack =
+                [S || [{rose} | _] = S <- Stacks],
+        Move = {[{rose}], '->', {free, FreeNum}},
+        NewPrevStacks = [NewStack | PrevStacks],
+        NewStacks = [NewStack | lists:delete(RoseStack, Stacks)],
+        #{{free, FreeNum} => {rose},
+          stacks => NewStacks,
+          moves => [Move | Moves],
+          previous_stacks => NewPrevStacks}
+
+is_rose_visible([]) ->
+  false;
+is_rose_visible([{rose} | _]) ->
+  true;
 
 is_valid_stack_move({_, _, #{moves := [{[_SingleCard], '->', {free, N}}  | _]} = State}) ->
     FreeN = maps:get({free, N}, State),
