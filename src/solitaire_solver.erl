@@ -6,6 +6,22 @@
 -compile(export_all).
 -endif.
 
+solve_abbrev(AbbrevCards) ->
+    FullCards = [full_card(C) || C <- AbbrevCards],
+    solve(FullCards).
+
+full_card(poppy) -> {poppy};
+full_card(dr) -> {dragon, red};
+full_card(db) -> {dragon, black};
+full_card(dg) -> {dragon, green};
+full_card(NumSuit) ->
+    [NumChar, SuitChar] = atom_to_list(NumSuit),
+    {list_to_integer([NumChar]), suit(SuitChar)}.
+
+suit($r) -> red;
+suit($b) -> black;
+suit($g) -> green.
+
 solve(Cards) ->
   Stacks = stacks(Cards),
   Finished = [[] || _ <- lists:seq(1, 4)],
@@ -19,10 +35,12 @@ solve(Cards) ->
             previous_stacks => Stacks,
             finished => Finished,
             moves => []},
-  solve_([State], 20000).
+  solve_([State], 10000).
 
-solve_(_, 0) ->
-    <<"Exhausted rounds">>;
+solve_(States, 0) ->
+    NumBestGuesses = 2,
+    io:format("Ran out of rounds, fetching ~p best guesses:~n", [NumBestGuesses]),
+    {best_guesses, reversed_moves_sorted_by_length(States, NumBestGuesses)};
 solve_([State | Rest] = States, Rounds) ->
     case lists:filter(fun is_solved/1, States) of
         [#{moves := Moves} | _] ->
@@ -44,9 +62,20 @@ solve_([State | Rest] = States, Rounds) ->
             solve_(NewStates ++ Rest, Rounds - 1)
     end.
 
+reversed_moves_sorted_by_length(States, Num) ->
+    %Moves = [lists:reverse(M) || #{moves := M} <- States],
+    %lists:sublist(lists:sort(fun sort_by_length/2, Moves), Num).
+    Moves = [M || #{moves := M} <- States],
+    lists:sublist(lists:sort(fun sort_by_length/2, Moves), Num).
+
+sort_by_length(List1, List2) ->
+    length(List1) > length(List2).
+
 stacks([]) ->
     [];
-stacks([[C1, C2, C3, C4, C5] | Rest]) ->
+stacks([[_ | _] = Stack | Rest]) ->
+    [Stack | stacks(Rest)];
+stacks([C1, C2, C3, C4, C5 | Rest]) ->
   [[C1, C2, C3, C4, C5] | stacks(Rest)].
 
 is_solved(#{stacks := Stacks} = _State) ->
@@ -92,7 +121,7 @@ move(State) ->
 
 stack_to_stack_moves(State) when is_map(State) ->
     MultiSubStacks = multi_substacks(State),
-    %ct:pal("~p: SubstackMoves~n\t~p~n", [?MODULE, SubstackMoves]),
+    %ct:pal("~p: MultiSubStacks~n\t~p~n", [?MODULE, MultiSubStacks]),
     lists:flatten([stack_to_stack_moves(MS) || MS <- MultiSubStacks]);
 
 stack_to_stack_moves({SubStacks, OtherStacks, State} = _Substack) ->
@@ -145,8 +174,7 @@ stack_to_stack_move(SubStack,
                     NewSourceStack,
                     OtherStack,
                     RestOfStacks,
-                    #{stacks := Stacks,
-                      moves := Moves,
+                    #{moves := Moves,
                       previous_stacks := PrevStacks} = State) ->
     NewTargetStack = SubStack ++ OtherStack,
     NewStacks = [NewSourceStack, NewTargetStack | RestOfStacks],
@@ -182,7 +210,7 @@ cards_to_free_moves(#{stacks := Stacks} = State) ->
             []
     end.
 
-card_to_free_move({{free, Suit}, empty},
+card_to_free_move({{free, N}, empty},
                    [Card | RestOfStack] = Stack,
                    #{stacks := Stacks,
                      moves := Moves,
@@ -190,7 +218,7 @@ card_to_free_move({{free, Suit}, empty},
     OtherStacks = lists:delete(Stack, Stacks),
     NewStacks = [RestOfStack | OtherStacks],
     State#{stacks => NewStacks,
-           {free, Suit} => Card,
+           {free, N} => Card,
            moves => [{Card, '->', free} | Moves],
            previous_stacks => [RestOfStack | PrevStacks]};
 card_to_free_move(_FreeCell, _Stack, _State) ->
