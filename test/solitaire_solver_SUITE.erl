@@ -30,6 +30,8 @@
     %[test_solve].
 %all() ->
     %[test_sub_stacks].
+%all() ->
+    %[test_multi_substacks].
 
 all() ->
     [test_solve,
@@ -240,18 +242,38 @@ test_multi_substacks(_Config) ->
               [{5, red}, {6, green}, {7, black}],
               [{7, red}, {8, green}, {9, black}]],
 	SubStacks =
-	    [{[{[{2, red}],[{3, green},{4, black}]},{[{2, red},{3, green}],[{4, black}]},{[{2, red},{3, green},{4, black}],[]}],
-          [[{5, red},{6, green},{7, black}],[{7, red},{8, green},{9, black}]],
-          #{stacks => [[{2, red},{3, green},{4, black}],[{5, red},{6, green},{7, black}],[{7, red},{8, green},{9, black}]]}},
-         {[{[{5, red}],[{6, green},{7, black}]},{[{5, red},{6, green}],[{7, black}]},{[{5, red},{6, green},{7, black}],[]}],
-          [[{2, red},{3, green},{4, black}],[{7, red},{8, green},{9, black}]],
-          #{stacks => [[{2, red},{3, green},{4, black}],[{5, red},{6, green},{7, black}],[{7, red},{8, green},{9, black}]]}},
-         {[{[{7, red}],[{8, green},{9, black}]},{[{7, red},{8, green}],[{9, black}]},{[{7, red},{8, green},{9, black}],[]}],
-          [[{2, red},{3, green},{4, black}],[{5, red},{6, green},{7, black}]],
-          #{stacks => [[{2, red},{3, green},{4, black}],[{5, red},{6, green},{7, black}],[{7, red},{8, green},{9, black}]]}}],
+	    [{[{[{2, red}],[{3, green},{4, black}]},
+           {[{2, red},{3, green}],[{4, black}]},
+           {[{2, red},{3, green},{4, black}],[]}],
+          [[{5, red},{6, green},{7, black}],
+           [{7, red},{8, green},{9, black}]],
+          #{stacks => [[{2, red},{3, green},{4, black}],
+                       [{5, red},{6, green},{7, black}],
+                       [{7, red},{8, green},{9, black}]]}},
+
+         {[{[{5, red}],[{6, green},{7, black}]},
+           {[{5, red},{6, green}],[{7, black}]},
+           {[{5, red},{6, green},{7, black}],[]}],
+          [[{2, red},{3, green},{4, black}],
+           [{7, red},{8, green},{9, black}]],
+          #{stacks => [[{2, red},{3, green},{4, black}],
+                       [{5, red},{6, green},{7, black}],
+                       [{7, red},{8, green},{9, black}]]}},
+
+         {[{[{7, red}],[{8, green},{9, black}]},
+           {[{7, red},{8, green}],[{9, black}]},
+           {[{7, red},{8, green},{9, black}],[]}],
+          [[{2, red},{3, green},{4, black}],
+           [{5, red},{6, green},{7, black}]],
+          #{stacks => [[{2, red},{3, green},{4, black}],
+                       [{5, red},{6, green},{7, black}],
+                       [{7, red},{8, green},{9, black}]]}}],
 
     State = #{stacks => Stacks},
-    SubStacks = ?SS:multi_substacks(State).
+    SubStacks = ?SS:multi_substacks(State),
+
+    ok.
+
 
 %% TODO test filtering out backtracking moves
 test_stack_to_stack_moves(_Config) ->

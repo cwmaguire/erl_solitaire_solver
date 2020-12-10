@@ -6,6 +6,8 @@
 -compile(export_all).
 -endif.
 
+% TODO check for duplicate cards!
+
 solve_abbrev(AbbrevCards) ->
     FullCards = [full_card(C) || C <- AbbrevCards],
     solve(FullCards).
@@ -23,19 +25,20 @@ suit($b) -> black;
 suit($g) -> green.
 
 solve(Cards) ->
-  Stacks = stacks(Cards),
-  Finished = [[] || _ <- lists:seq(1, 4)],
-  State = #{{free, 1} => empty,
-            {free, 2} => empty,
-            {free, 3} => empty,
-            {finish, red} => [empty],
-            {finish, black} => [empty],
-            {finish, green} => [empty],
-            stacks => Stacks,
-            previous_stacks => Stacks,
-            finished => Finished,
-            moves => []},
-  solve_([State], 10000).
+    Stacks = stacks(Cards),
+    Finished = [[] || _ <- lists:seq(1, 4)],
+    State =
+        #{{free, 1} => empty,
+          {free, 2} => empty,
+          {free, 3} => empty,
+          {finish, red} => [empty],
+          {finish, black} => [empty],
+          {finish, green} => [empty],
+          stacks => Stacks,
+          previous_stacks => Stacks,
+          finished => Finished,
+          moves => []},
+    solve_([State], 30000).
 
 solve_(States, 0) ->
     NumBestGuesses = 2,
@@ -121,7 +124,7 @@ move(State) ->
 
 stack_to_stack_moves(State) when is_map(State) ->
     MultiSubStacks = multi_substacks(State),
-    %ct:pal("~p: MultiSubStacks~n\t~p~n", [?MODULE, MultiSubStacks]),
+    %io:format("MultiSubStacks~p~n", [MultiSubStacks]),
     lists:flatten([stack_to_stack_moves(MS) || MS <- MultiSubStacks]);
 
 stack_to_stack_moves({SubStacks, OtherStacks, State} = _Substack) ->
