@@ -12,27 +12,36 @@ solve(Cards) ->
   State = #{{free, 1} => empty,
             {free, 2} => empty,
             {free, 3} => empty,
+            {finish, red} => [empty],
+            {finish, black} => [empty],
+            {finish, green} => [empty],
             stacks => Stacks,
             previous_stacks => Stacks,
             finished => Finished,
             moves => []},
-  solve_([State], 10).
+  solve_([State], 20000).
 
 solve_(_, 0) ->
-    <<"Exhausted 10 rounds">>;
+    <<"Exhausted rounds">>;
 solve_([State | Rest] = States, Rounds) ->
-    ct:pal("~p: Rounds~n\t~p~n", [?MODULE, Rounds]),
     case lists:filter(fun is_solved/1, States) of
         [#{moves := Moves} | _] ->
             lists:reverse(Moves);
         _ ->
             NewStates = move(State),
 
-            StateParts = [maps:with([moves], S) || S <- NewStates],
-            ct:pal("~p: NewStates~n\t~p~n", [?MODULE, StateParts]),
+            %LongMoves = lists:filter(fun(#{moves := Moves}) -> length(Moves) > 30 end, NewStates),
+            %StateParts = [maps:with([moves], S) || S <- NewStates],
+            %case LongMoves of
+            %    [] ->
+            %        ok;
+            %    LongMoves_ ->
+            %        StateParts = [maps:with([moves], S) || S <- LongMoves],
+            %        ct:pal("~p: Rounds: ~p~nNewStates~n\t~p~n", [?MODULE, Rounds, StateParts])
+            %end,
             %ct:pal("~p: NewMoves~n\t~p~n", [?MODULE, NewMoves]),
 
-            solve_(Rest ++ NewStates, Rounds - 1)
+            solve_(NewStates ++ Rest, Rounds - 1)
     end.
 
 stacks([]) ->
@@ -62,21 +71,21 @@ is_stack_empty([_ | _]) ->
 move(State) ->
     StackToStack = stack_to_stack_moves(State),
     NewStates =
-        [StackToStack,
-         cards_to_free_moves(State),
-         free_to_stack_moves(State),
-         cards_to_finish_moves(State),
+        [poppy_move(State),
          slay_dragon_moves(State),
-         poppy_move(State)],
+         cards_to_finish_moves(State),
+         StackToStack,
+         free_to_stack_moves(State),
+         cards_to_free_moves(State)],
     FlattenedNewStates = lists:flatten(NewStates),
 
-    StateParts = [maps:with([moves], S) || S <- FlattenedNewStates],
-    ct:pal("~p: FlattenedNewStates~n\t~p~n", [?MODULE, StateParts]),
+    % StateParts = [maps:with([moves], S) || S <- FlattenedNewStates],
+    % ct:pal("~p: FlattenedNewStates~n\t~p~n", [?MODULE, StateParts]),
 
     %StateParts = [maps:with([moves], S) || S <- FlattenedNewStates],
 
-    StateParts2 = [maps:with([moves], S) || S <- StackToStack],
-    ct:pal("~p: StackToStack~n\t~p~n", [?MODULE, StateParts2]),
+    % StateParts2 = [maps:with([moves], S) || S <- StackToStack],
+    % ct:pal("~p: StackToStack~n\t~p~n", [?MODULE, StateParts2]),
 
     FlattenedNewStates.
 
@@ -173,7 +182,7 @@ cards_to_free_moves(#{stacks := Stacks} = State) ->
             []
     end.
 
-card_to_free_move({{free, N}, empty},
+card_to_free_move({{free, Suit}, empty},
                    [Card | RestOfStack] = Stack,
                    #{stacks := Stacks,
                      moves := Moves,
@@ -181,7 +190,7 @@ card_to_free_move({{free, N}, empty},
     OtherStacks = lists:delete(Stack, Stacks),
     NewStacks = [RestOfStack | OtherStacks],
     State#{stacks => NewStacks,
-           {free, N} => Card,
+           {free, Suit} => Card,
            moves => [{Card, '->', free} | Moves],
            previous_stacks => [RestOfStack | PrevStacks]};
 card_to_free_move(_FreeCell, _Stack, _State) ->
@@ -210,23 +219,33 @@ free_to_stack_move({{free, Suit}, Card},
 cards_to_finish_moves(#{stacks := Stacks} = State) ->
     FinishCells = [FC || FC = {{finish, _}, _Cards} <- maps:to_list(State)],
     [card_to_finish_move(FinishCell, Stack, State) || FinishCell <- FinishCells,
-                                                    Stack <- Stacks].
+                                                      Stack <- Stacks].
 
-card_to_finish_move({{finish, Suit},
-                     [{FinNum, Suit} | _ ] = FinishStack},
+card_to_finish_move({{finish, Suit}, [FinCard | _ ] = FinishStack},
                    [{CardNum, Suit} = TopStackCard | RestOfStack] = Stack,
                    #{stacks := Stacks,
                      moves := Moves,
-                     previous_stacks := PrevStacks} = State)
-        when FinNum == empty, CardNum == 1;
-             CardNum == FinNum + 1 ->
-    OtherStacks = lists:delete(Stack, Stacks),
-    NewStacks = [RestOfStack | OtherStacks],
-    NewFinishStack = [TopStackCard | FinishStack],
-    State#{stacks => NewStacks,
-           {finish, Suit} => NewFinishStack,
-           moves => [{TopStackCard, '->', finish} | Moves],
-           previous_stacks => [RestOfStack | PrevStacks]};
+                     previous_stacks := PrevStacks} = State) ->
+    case {FinCard, CardNum} of
+        {empty, NotOne} when NotOne /= 1 ->
+            _InvalidMove = [];
+        {{NumFin, _}, NumCard} when NumCard /= (NumFin + 1) ->
+            _InvalidMove = [];
+        _ ->
+            OtherStacks = lists:delete(Stack, Stacks),
+            NewStacks = [RestOfStack | OtherStacks],
+            NewFinishStack =
+                case FinCard of
+                    empty ->
+                        [TopStackCard];
+                    _ ->
+                        [TopStackCard | FinishStack]
+                end,
+            State#{stacks => NewStacks,
+                   {finish, Suit} => NewFinishStack,
+                   moves => [{TopStackCard, '->', finish} | Moves],
+                   previous_stacks => [RestOfStack | PrevStacks]}
+    end;
 card_to_finish_move(_FreeCell, _Stack, _State) ->
     _InvalidMove = [].
 

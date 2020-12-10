@@ -4,6 +4,7 @@
 %% I know I could do export_all, but I like this. Sue me. :)
 -export([test_solve/1]).
 -export([test_is_solved/1]).
+-export([test_cards_to_finish_moves/1]).
 -export([test_poppy_move/1]).
 -export([test_multi_substacks/1]).
 -export([test_stack_to_stack_moves/1]).
@@ -25,43 +26,44 @@
 -export([test_has_alternating_suits/1]).
 
 -define(SS, solitaire_solver).
+%all() ->
+    %[test_solve].
+%all() ->
+    %[test_cards_to_finish_moves].
+
 all() ->
-    [test_solve].
+    [test_solve,
+     test_cards_to_finish_moves,
+     test_poppy_move,
+     test_multi_substacks,
+     test_stack_to_stack_moves,
+     test_remove_substack,
+     test_cards_to_free_moves,
+     test_slay_dragon_moves,
+     test_visible_dragons,
+     test_maybe_slay_dragon,
+     test_has_empty_free_cell,
+     test_has_matching_free_cell_dragon,
+     test_dragon_free_cells,
+     test_add_dragon,
+     test_slay_dragon,
+     test_remove_dragon,
+     test_is_valid_stack_move,
+     test_get_orig_target_stack,
+     test_remove_stack,
+     test_has_alternating_suits,
+     test_substacks].
 
-% all() ->
-%     [test_solve,
-%      test_poppy_move,
-%      test_multi_substacks,
-%      test_stack_to_stack_moves,
-%      test_remove_substack,
-%      test_cards_to_free_moves,
-%      test_slay_dragon_moves,
-%      test_visible_dragons,
-%      test_maybe_slay_dragon,
-%      test_has_empty_free_cell,
-%      test_has_matching_free_cell_dragon,
-%      test_dragon_free_cells,
-%      test_add_dragon,
-%      test_slay_dragon,
-%      test_remove_dragon,
-%      test_is_valid_stack_move,
-%      test_get_orig_target_stack,
-%      test_remove_stack,
-%      test_has_alternating_suits,
-%      test_substacks].
-
-% Saving this hear because I don't want to look it up again
+% Saving this here because I don't want to look it up again
 %dbg:tracer(),
 %dbg:p(all, call),
 %dbg:tpl(solitaire_solver, is_valid_stack_move, [{'_', [], [{return_trace}]}]),
 %dbg:tpl(solitaire_solver, stack_to_stack_moves_, [{'_', [], [{return_trace}]}]),
 
-test_solve_mini(_Config) ->
-    Cards = [],
-    MoveLists = ?SS:solve(Cards),
-    ct:pal("~p: MoveLists~n\t~p~n", [?MODULE, MoveLists]).
-
 test_solve(_Config) ->
+    dbg:tracer(),
+    dbg:p(all, call),
+    dbg:tpl(solitaire_solver, card_to_finish_moves, [{'_', [], [{return_trace}]}]),
     Cards =
         [[{4, black},
           {dragon, 1}, % 1 = black
@@ -104,7 +106,61 @@ test_solve(_Config) ->
           {5, black},
           {8, black}]],
     MoveLists = ?SS:solve(Cards),
-    ct:pal("~p: MoveLists~n\t~p~n", [?MODULE, MoveLists]).
+    ct:pal("~p: MoveLists~n\t~p~n", [?MODULE, MoveLists]),
+
+	ExpectedLists =
+        [{[{4,black}],'->',{5,red}},
+         {[{2,black},{3,green}],'->',{4,black}},
+         {[{6,red}],'->',{7,green}},
+         {{dragon,3},'->',free},
+         {{dragon,1},'->',free},
+         {{dragon,2},'->',free},
+         {[{8,green}],'->',{9,black}},
+         {{1,black},'->',finish},
+         {slay,1},
+         {{2,black},'->',finish},
+         {[{8,green},{9,black}],'->',[]},
+         {{1,green},'->',finish},
+         {slay,3},
+         {{1,red},'->',finish},
+         {[{8,red}],'->',[]},
+         {[{3,red}],'->',{4,green}},
+         {[{3,green},{4,black},{5,red}],'->',{6,black}},
+         {[{6,red},{7,green}],'->',{8,red}},
+         {slay,2},
+         {[{5,green}],'->',[]},
+         {{2,red},'->',finish},
+         {{3,red},'->',finish},
+         {[{4,green}],'->',[]},
+         {[{7,red}],'->',{8,green}},
+         {{2,green},'->',finish},
+         {{3,black},'->',finish},
+         {{3,green},'->',finish},
+         {{4,black},'->',finish},
+         {{4,green},'->',finish},
+         {{5,green},'->',finish},
+         {{4,red},'->',finish},
+         {{5,red},'->',finish},
+         {{6,red},'->',finish},
+         {{7,red},'->',finish},
+         {[{8,green}],'->',[]},
+         {[{9,red}],'->',[]},
+         {[{7,black}],'->',{8,green}},
+         {{6,green},'->',finish},
+         {{7,green},'->',finish},
+         {{8,red},'->',finish},
+         {{9,red},'->',finish},
+         {[{9,green}],'->',[]},
+         {[{poppy}],'->',{poppy}},
+         {{5,black},'->',finish},
+         {{6,black},'->',finish},
+         {{7,black},'->',finish},
+         {{8,black},'->',finish},
+         {{9,black},'->',finish},
+         {{8,green},'->',finish},
+         {{9,green},'->',finish}],
+
+    MoveLists = ExpectedLists.
 
 test_is_solved(_Config) ->
     State1 = #{stacks => [[], [], [], []]},
@@ -112,6 +168,52 @@ test_is_solved(_Config) ->
 
     true = ?SS:is_solved(State1),
     false = ?SS:is_solved(State2).
+
+test_cards_to_finish_moves(_Config) ->
+    Stacks1 = [[{1, red}]],
+    State1 =
+        #{{finish, red} => [empty],
+          {finish, black} => [empty],
+          {finish, green} => [empty],
+          stacks => Stacks1,
+          moves => [],
+          previous_stacks => Stacks1},
+    [[], [], #{{finish, red} := [{1, red}]}] =
+        ?SS:cards_to_finish_moves(State1),
+
+    Stacks2 = [[{2, red}]],
+    State2 =
+        #{{finish, red} => [empty],
+          {finish, black} => [empty],
+          {finish, green} => [empty],
+          stacks => Stacks2,
+          moves => [],
+          previous_stacks => Stacks2},
+    [[], [], []] = ?SS:cards_to_finish_moves(State2),
+
+    Stacks3 = [[{2, red}]],
+    State3 =
+        #{{finish, red} => [{1, red}],
+          {finish, black} => [empty],
+          {finish, green} => [empty],
+          stacks => Stacks3,
+          moves => [],
+          previous_stacks => Stacks3},
+    [[], [], #{{finish, red} := [{2, red}, {1, red}]}] =
+        ?SS:cards_to_finish_moves(State3),
+
+    Stacks4 = [[{3, red}]],
+    State4 =
+        #{{finish, red} => [{1, red}],
+          {finish, black} => [empty],
+          {finish, green} => [empty],
+          stacks => Stacks4,
+          moves => [],
+          previous_stacks => Stacks4},
+    [[], [], []] =
+        ?SS:cards_to_finish_moves(State4),
+
+    ok.
 
 test_poppy_move(_Config) ->
     NewStacks =
