@@ -1,6 +1,7 @@
 -module(solitaire_solver).
 
 -export([solve/1]).
+-export([solve_abbrev/1]).
 
 -ifdef(TEST).
 -compile(export_all).
@@ -10,7 +11,7 @@
 
 solve_abbrev(AbbrevCards) ->
     FullCards = [full_card(C) || C <- AbbrevCards],
-    solve(FullCards).
+    maybe_solve(are_cards_valid(FullCards)).
 
 full_card(poppy) -> {poppy};
 full_card(dr) -> {dragon, red};
@@ -25,6 +26,11 @@ suit($b) -> black;
 suit($g) -> green.
 
 solve(Cards) ->
+    maybe_solve(are_cards_valid(Cards)).
+
+maybe_solve({errors, Errors}) ->
+    io:format("Errors: ~p~n", [Errors]);
+maybe_solve(Cards) ->
     Stacks = stacks(Cards),
     Finished = [[] || _ <- lists:seq(1, 4)],
     State =
@@ -38,7 +44,7 @@ solve(Cards) ->
           previous_stacks => Stacks,
           finished => Finished,
           moves => []},
-    solve_([State], 30000).
+    solve_([State], 60000).
 
 solve_(States, 0) ->
     NumBestGuesses = 2,
@@ -105,11 +111,20 @@ move(State) ->
     NewStates =
         [poppy_move(State),
          slay_dragon_moves(State),
+         free_to_finish_moves(State),
          cards_to_finish_moves(State),
          StackToStack,
          free_to_stack_moves(State),
          cards_to_free_moves(State)],
     FlattenedNewStates = lists:flatten(NewStates),
+
+    case {FlattenedNewStates, State} of
+        {[], #{moves := Moves}} ->
+            io:format("Ran out of moves:~n~p~n", [Moves]);
+        _ ->
+            ok
+    end,
+
 
     % StateParts = [maps:with([moves], S) || S <- FlattenedNewStates],
     % ct:pal("~p: FlattenedNewStates~n\t~p~n", [?MODULE, StateParts]),
@@ -200,11 +215,6 @@ stack_to_stack_move(SubStack,
             previous_stacks => PrevStacks1,
             stacks => NewStacks}}.
 
-remove_substack([X | _] = SubStack, [[X | _] = Stack | _Stacks]) ->
-    lists:subtract(Stack, SubStack);
-remove_substack(SubStack, [_ | Stacks]) ->
-    remove_substack(SubStack, Stacks).
-
 cards_to_free_moves(#{stacks := Stacks} = State) ->
     case [FC || FC = {{free, _}, empty} <- maps:to_list(State)] of
         [EmptyFreeCell | _] ->
@@ -246,6 +256,29 @@ free_to_stack_move({{free, Suit}, Card},
            {free, Suit} => empty,
            moves => [{Card, '->', hd(Stack)} | Moves],
            previous_stacks => [NewStack | PrevStacks]}.
+
+free_to_finish_moves(State) ->
+    FullFreeCells = [Free || Free = {{free, _}, {_, _}} <- maps:to_list(State)],
+    FinishedCells = [Finish || Finish = {{finish, _}, _} <- maps:to_list(State)],
+    Combos = [{FFC, FC, State} || FFC <- FullFreeCells, FC <- FinishedCells],
+    lists:filtermap(fun free_to_finish_move/1, Combos).
+
+free_to_finish_move({{{free, N}, {1, Suit} = Card},
+                     {{finish, Suit}, [empty] = Cards},
+                     State}) ->
+    {true, free_n_to_finish(N, Card, Suit, Cards, State)};
+free_to_finish_move({{{free, N}, {NumPlus1, Suit} = Card},
+                     {{finish, Suit}, [{Num, _} | _] = Cards},
+                     State}) when NumPlus1 == (Num + 1) ->
+    {true, free_n_to_finish(N, Card, Suit, Cards, State)};
+free_to_finish_move(_) ->
+    false.
+
+free_n_to_finish(FreeN, Card, Suit, FinishedCards, State = #{moves := Moves}) ->
+     State#{moves => [{Card, '->', finish} | Moves],
+            {free, FreeN} => empty,
+            {finish, Suit} => [Card | FinishedCards]}.
+
 
 cards_to_finish_moves(#{stacks := Stacks} = State) ->
     FinishCells = [FC || FC = {{finish, _}, _Cards} <- maps:to_list(State)],
@@ -465,11 +498,6 @@ get_orig_target_stack([X | _] = Addition, [[X | _] = Stack | _Rest]) ->
 get_orig_target_stack([_ | _] = Addition, [_ | Rest]) ->
     get_orig_target_stack(Addition, Rest).
 
-remove_stack([], Remaining) ->
-    Remaining;
-remove_stack([_ | Rest1], [_ | Rest2]) ->
-    remove_stack(Rest1, Rest2).
-
 has_alternating_suits([]) ->
     true;
 has_alternating_suits([_]) ->
@@ -490,7 +518,7 @@ sub_stacks([_], SubStacks, _) ->
     SubStacks;
 sub_stacks(Stack, SubStacks, Rest) ->
     Last = lists:last(Stack),
-    AllButLast = lists:delete(Last, Stack),
+    AllButLast = lists:droplast(Stack),
     RestOfStack = [Last | Rest],
     sub_stacks(AllButLast, [{AllButLast, RestOfStack} | SubStacks], RestOfStack).
 
@@ -534,3 +562,63 @@ has_alternating_colours([{_, C}, {_, C} | _]) ->
     false;
 has_alternating_colours([_ | Rest]) ->
     has_alternating_colours(Rest).
+
+are_cards_valid(Cards) ->
+    are_cards_valid(Cards, 40).
+
+are_cards_valid(Cards, Count) ->
+    MaybeErrors = [are_unique(Cards),
+                   correct_number_of_cards(Cards, Count),
+                   correct_number_of_dragons(Cards)],
+    case lists:flatten(MaybeErrors) of
+        [] ->
+            Cards;
+        Errors ->
+            {errors, Errors}
+    end.
+
+correct_number_of_cards(Cards, Count) ->
+    case length(Cards) of
+        X when X < Count ->
+            Error = io_lib:format("Only ~p cards, need ~p.", [X, Count]),
+            [list_to_binary(Error)];
+        X when X > Count ->
+            Error = io_lib:format("~p cards is too many, should have ~p.", [X, Count]),
+            [list_to_binary(Error)];
+        _ ->
+            []
+    end.
+
+correct_number_of_dragons(Cards) ->
+    Suits = [red, green, black],
+    Errors = [correct_number_of_dragons(Cards, Suit) || Suit <- Suits],
+    lists:flatten(Errors).
+
+correct_number_of_dragons(Cards, Suit) ->
+    SuitDragons =
+    [Dragon || Dragon = {dragon, Suit_} <- Cards, Suit == Suit_],
+    case length(SuitDragons) of
+        4 ->
+            [];
+        X ->
+            Error = io_lib:format("Counted ~p ~p dragons, expected 4", [X, Suit]),
+            [list_to_binary(Error)]
+    end.
+
+are_unique(Cards) ->
+    {_, NonDragonCards} = lists:partition(fun is_dragon/1, Cards),
+    Sorted = lists:sort(NonDragonCards),
+    SortedUnique = lists:usort(NonDragonCards),
+    case Sorted == SortedUnique of
+        true ->
+            [];
+        false ->
+            Dupes = lists:subtract(Sorted, SortedUnique),
+            Error = io_lib:format("Dupe cards: ~p", [Dupes]),
+            [list_to_binary(Error)]
+    end.
+
+is_dragon({dragon, _}) ->
+    true;
+is_dragon(_) ->
+    false.

@@ -4,6 +4,7 @@
 %% I know I could do export_all, but I like this. Sue me. :)
 -export([test_solve/1]).
 -export([test_is_solved/1]).
+-export([test_free_to_finish_moves/1]).
 -export([test_cards_to_finish_moves/1]).
 -export([test_poppy_move/1]).
 -export([test_multi_substacks/1]).
@@ -28,13 +29,10 @@
 -define(SS, solitaire_solver).
 %all() ->
     %[test_solve].
-%all() ->
-    %[test_sub_stacks].
-%all() ->
-    %[test_multi_substacks].
 
 all() ->
     [test_solve,
+     test_free_to_finish_moves,
      test_cards_to_finish_moves,
      test_poppy_move,
      test_multi_substacks,
@@ -169,6 +167,59 @@ test_is_solved(_Config) ->
 
     true = ?SS:is_solved(State1),
     false = ?SS:is_solved(State2).
+
+test_free_to_finish_moves(_Config) ->
+    TestMismatch =
+        fun({Card,
+             {FinishNum, FinishSuit}}) ->
+            State = #{{free, 1} => Card,
+                      {finish, FinishSuit} => [{FinishNum, FinishSuit}],
+                      moves => []},
+            [] = ?SS:free_to_finish_moves(State)
+        end,
+
+    MismatchedCards =
+        [{{1, black}, {red, empty}},
+         {{1, red}, {green, empty}},
+         {{1, green}, {black, empty}},
+         {{2, black}, {red, 1}},
+         {{2, red}, {green, 1}},
+         {{2, green}, {black, 1}},
+         {{3, black}, {black, 1}},
+         {{3, red}, {green, 1}},
+         {{dragon, green}, {green, 1}},
+         {{poppy}, {green, 1}}],
+    [TestMismatch(M) || M <- MismatchedCards],
+
+    NotOneOntoEmptyState =
+        #{{free, 1} => {2, green},
+          {finish, green} => [empty],
+          moves => []},
+    [] = ?SS:free_to_finish_moves(NotOneOntoEmptyState),
+
+    DragonState =
+        #{{free, 2} => {dragon, black},
+          {finish, black} => [empty],
+          moves => []},
+    [] = ?SS:free_to_finish_moves(DragonState),
+
+    PoppyState =
+        #{{free, 2} => {poppy},
+          {finish, black} => [empty],
+          moves => []},
+    [] = ?SS:free_to_finish_moves(PoppyState),
+
+    GoodState =
+        #{{free, 3} => {2, black},
+          {finish, black} => [{1, black}],
+          moves => []},
+    GoodResultState =
+        #{moves => [{{2, black}, '->', finish}],
+          {free, 3} => empty,
+          {finish, black} => [{2, black}, {1, black}]},
+    [GoodResultState] = ?SS:free_to_finish_moves(GoodState),
+
+    ok.
 
 test_cards_to_finish_moves(_Config) ->
     Stacks1 = [[{1, red}]],
