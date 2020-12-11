@@ -2,6 +2,7 @@
 
 -export([solve/1]).
 -export([solve_abbrev/1]).
+-export([draw_moves/1]).
 
 -ifdef(TEST).
 -compile(export_all).
@@ -118,9 +119,10 @@ move(State) ->
          cards_to_free_moves(State)],
     FlattenedNewStates = lists:flatten(NewStates),
 
-    case {FlattenedNewStates, State} of
-        {[], #{moves := Moves}} ->
-            io:format("Ran out of moves:~n~p~n", [Moves]);
+    case FlattenedNewStates of
+        [] ->
+            StacksAndMoves = maps:without([previous_stacks], State),
+            io:format("Ran out of moves:~n~p~n", [StacksAndMoves]);
         _ ->
             ok
     end,
@@ -622,3 +624,89 @@ is_dragon({dragon, _}) ->
     true;
 is_dragon(_) ->
     false.
+
+draw_moves(State) ->
+    StackLines = stack_lines(State),
+    FreeLine = free_line(State),
+    io:format(user, "FreeLine = ~p~n", [iolist_to_binary(FreeLine)]),
+    FinishedLine = finished_line(State),
+    io:format(user, "FinishedLine = ~p~n", [iolist_to_binary(FinishedLine)]),
+    Merged = merge_lines(StackLines, [FreeLine, FinishedLine], []),
+    [io:format("~p~n", [iolist_to_binary(Line)]) || Line <- Merged].
+
+merge_lines([], [], Merged) ->
+    lists:reverse(Merged);
+merge_lines([], [Line2 | Rest2], Merged) ->
+    EmptyLine = <<"                                ">>,
+    merge_lines([], Rest2, [[EmptyLine, Line2] | Merged]);
+merge_lines([Line1 | Rest1], [], Merged) ->
+    EmptyLine = <<"                        ">>,
+    merge_lines(Rest1, [], [[Line1, EmptyLine] | Merged]);
+merge_lines([Line1 | Rest1], [Line2 | Rest2], Merged) ->
+    merge_lines(Rest1, Rest2, [[Line1, Line2] | Merged]).
+
+free_line(State) ->
+    FreeCells = lists:sort([F || F = {{free, _}, _} <- maps:to_list(State)]),
+    [free_cell(FC) || FC <- FreeCells].
+
+free_cell({{free, Num}, empty}) ->
+    [<<" ">>, i2b(Num), <<":[  ] ">>];
+free_cell({{free, Num}, {I, Suit}}) when is_integer(I), is_atom(Suit) ->
+    [<<" ">>, i2b(Num), <<":[">>, i2b(I), a2b(Suit), <<"] ">>];
+free_cell({{free, Num}, {Dragon, Suit}}) when is_atom(Dragon), is_atom(Suit) ->
+    [<<" ">>, i2b(Num), <<":[">>, a2b(Dragon), a2b(Suit), <<"] ">>].
+
+finished_line(State) ->
+    FinishedCells =
+        [fin_head(FC) || FC = {{finish, _}, _} <- maps:to_list(State)],
+    lists:sort(FinishedCells).
+
+fin_head({{finish, Suit}, [empty]}) ->
+    [<<" ">>, a2b(Suit), <<":[  ] ">>];
+fin_head({{finish, Suit}, [{Num, _Suit} | _]}) ->
+    [<<" ">>, a2b(Suit), <<":[">>, i2b(Num), a2b(Suit), <<"] ">>].
+
+stack_lines(#{stacks := Stacks}) ->
+    OrdStacks = lists:sort(fun sort_stacks/2, Stacks),
+    stack_lines(OrdStacks, _Lines = []).
+
+sort_stacks([], _) ->
+    _StacksToRight = false;
+sort_stacks(_, []) ->
+    _StacksToRight = true;
+sort_stacks([X | _], [Y | _]) when X < Y ->
+    true;
+sort_stacks(_, _) ->
+    false.
+
+stack_lines(Stacks, Lines) ->
+    case length(lists:flatten(Stacks)) == 0 of
+        false ->
+            {Lasts, Inits} = lists:unzip([chop(Stack) || Stack <- Stacks]),
+            BinLasts = iolist_to_binary([Lasts, <<" | ">>]),
+            stack_lines(Inits, [BinLasts | Lines]);
+        true ->
+            lists:reverse(Lines)
+    end.
+
+chop([]) ->
+    {<<"    ">>, []};
+chop(List) ->
+    Last = lists:last(List),
+    Init = lists:droplast(List),
+    BinLast = to_bin(Last),
+    {BinLast, Init}.
+
+to_bin({I, A}) when is_integer(I) and is_atom(A) ->
+    [i2b(I), a2b(A), <<"  ">>];
+to_bin({A1, A2}) when is_atom(A1) and is_atom(A2) ->
+    [a2b(A1), a2b(A2), <<"  ">>];
+to_bin({poppy}) ->
+    <<"pp  ">>.
+
+a2b(A) ->
+    [X | _] = atom_to_list(A),
+    list_to_binary([X]).
+
+i2b(I) ->
+    integer_to_binary(I).
