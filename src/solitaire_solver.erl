@@ -2,7 +2,7 @@
 
 -export([solve/1]).
 -export([solve_abbrev/1]).
--export([draw_moves/1]).
+-export([draw_moves/2]).
 
 -ifdef(TEST).
 -compile(export_all).
@@ -625,12 +625,12 @@ is_dragon({dragon, _}) ->
 is_dragon(_) ->
     false.
 
-draw_moves(State) ->
-    StackLines = stack_lines(State),
+draw_moves(AbbrevCards, Moves) ->
+    FullCards = [full_card(C) || C <- AbbrevCards],
+    Stacks = stacks(FullCards),
+    StackLines = stack_lines(Stacks),
     FreeLine = free_line(State),
-    io:format(user, "FreeLine = ~p~n", [iolist_to_binary(FreeLine)]),
     FinishedLine = finished_line(State),
-    io:format(user, "FinishedLine = ~p~n", [iolist_to_binary(FinishedLine)]),
     Merged = merge_lines(StackLines, [FreeLine, FinishedLine], []),
     [io:format("~p~n", [iolist_to_binary(Line)]) || Line <- Merged].
 
@@ -666,7 +666,7 @@ fin_head({{finish, Suit}, [empty]}) ->
 fin_head({{finish, Suit}, [{Num, _Suit} | _]}) ->
     [<<" ">>, a2b(Suit), <<":[">>, i2b(Num), a2b(Suit), <<"] ">>].
 
-stack_lines(#{stacks := Stacks}) ->
+stack_lines(Stacks) ->
     OrdStacks = lists:sort(fun sort_stacks/2, Stacks),
     stack_lines(OrdStacks, _Lines = []).
 
