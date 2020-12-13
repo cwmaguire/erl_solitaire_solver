@@ -8,7 +8,8 @@
 -export([test_cards_to_finish_moves/1]).
 -export([test_poppy_move/1]).
 -export([test_multi_substacks/1]).
--export([test_stack_to_stack_moves/1]).
+-export([test_stack_to_stack_moves_1/1]).
+-export([test_stack_to_stack_moves_2/1]).
 -export([test_cards_to_free_moves/1]).
 -export([test_slay_dragon_moves/1]).
 -export([test_visible_dragons/1]).
@@ -25,16 +26,20 @@
 -export([test_has_alternating_suits/1]).
 
 -define(SS, solitaire_solver).
+%all() ->
+    %[test_solve].
 all() ->
-    [test_solve].
+    [test_stack_to_stack_moves_1,
+     test_stack_to_stack_moves_2].
 
 %all() ->
-    %[test_solve,
+    %[%test_solve,
      %test_free_to_finish_moves,
      %test_cards_to_finish_moves,
      %test_poppy_move,
      %test_multi_substacks,
-     %test_stack_to_stack_moves,
+     %test_stack_to_stack_moves_1,
+     %test_stack_to_stack_moves_2,
      %test_cards_to_free_moves,
      %test_slay_dragon_moves,
      %test_visible_dragons,
@@ -324,40 +329,83 @@ test_multi_substacks(_Config) ->
 
 
 %% TODO test filtering out backtracking moves
-test_stack_to_stack_moves(_Config) ->
-    Stacks = [[{1, red}, {2, green}, {9, black}],
-              [{3, black}, {4, red}, {5, green}],
-              [{6, black}, {7, red}, {8, green}]],
+test_stack_to_stack_moves_1(_Config) ->
+    Stacks = [[{2, red}, {3, green}, {9, black}],
+              [{4, black}, {5, red}, {6, green}],
+              [{7, black}, {8, red}, {9, green}]],
     State =
         #{stacks => Stacks,
           moves => [],
           previous_stacks => gb_sets:from_list(Stacks)},
 
     PrevStacks1 =
-        gb_sets:from_list([[{9,black}],
-                           [{1,red},{2,green},{3,black},{4,red},{5,green}],
-                           [{1,red},{2,green},{9,black}],
-                           [{3,black},{4,red},{5,green}],
-                           [{6,black},{7,red},{8,green}]]),
+        lists:sort([[{9,black}],
+                    [{2,red},{3,green},{4,black},{5,red},{6,green}],
+                    [{2,red},{3,green},{9,black}],
+                    [{4,black},{5,red},{6,green}],
+                    [{7,black},{8,red},{9,green}]]),
+
     PrevStacks2 =
-        gb_sets:from_list([[{3,black},{4,red},{5,green},{6,black},{7,red},{8,green}],
-                           [{1,red},{2,green},{9,black}],
-                           [{3,black},{4,red},{5,green}],
-                           [{6,black},{7,red},{8,green}]]),
+        lists:sort([[{2,red},{3,green},{9,black}],
+                    [{4,black},{5,red},{6,green}],
+                    [{7,black},{8,red},{9,green}],
+                    [{4,black},{5,red},{6,green},{7,black},{8,red},{9,green}]]),
+
     Moves = ?SS:stack_to_stack_moves(State),
     ct:pal("~p: Moves~n\t~p~n", [?MODULE, Moves]),
 
-	[#{moves := [{[{1,red},{2,green}],'->',{3,black}}],
-       previous_stacks := PrevStacks1,
+	[#{moves := [{[{2,red},{3,green}],'->',{4,black}}],
+       previous_stacks := NewPrevStacks1,
        stacks := [[{9,black}],
-                  [{1,red},{2,green},{3,black},{4,red},{5,green}],
-                  [{6,black},{7,red},{8,green}]]},
-     #{moves := [{[{3,black},{4,red},{5,green}],'->',{6,black}}],
-       previous_stacks := PrevStacks2,
+                  [{2,red},{3,green},{4,black},{5,red},{6,green}],
+                  [{7,black},{8,red},{9,green}]]},
+     #{moves := [{[{4,black},{5,red},{6,green}],'->',{7,black}}],
+       previous_stacks := NewPrevStacks2,
        stacks := [[],
-                  [{3,black},{4,red},{5,green},{6,black},{7,red},{8,green}],
-                  [{1,red},{2,green},{9,black}]]}]
-        = ?SS:stack_to_stack_moves(State).
+                  [{4,black},{5,red},{6,green},{7,black},{8,red},{9,green}],
+                  [{2,red},{3,green},{9,black}]]}]
+        = ?SS:stack_to_stack_moves(State),
+
+    PrevStacks1 = lists:sort(gb_sets:to_list(NewPrevStacks1)),
+    PrevStacks2 = lists:sort(gb_sets:to_list(NewPrevStacks2)).
+
+test_stack_to_stack_moves_2(_Config) ->
+    Stacks = [FirstStack = [{2, red}, {3, green}, {9, black}],
+              []],
+    State =
+        #{stacks => Stacks,
+          moves => [],
+          previous_stacks => gb_sets:from_list([FirstStack])},
+
+    PrevStacks1 =
+        lists:sort([[{2, red}, {3, green}, {9,black}],
+                    [{3, green}, {9, black}],
+                    [{2,red}]]),
+
+    PrevStacks2 =
+        lists:sort([[{2, red}, {3, green}, {9, black}],
+                    [{9,black}],
+                    [{2,red},{3,green}]]),
+
+    Moves = ?SS:stack_to_stack_moves(State),
+    ct:pal("~p: Moves~n\t~p~n", [?MODULE, Moves]),
+
+	[#{moves := [{[{2,red}],'->',[]}],
+       previous_stacks := NewPrevStacks1,
+       stacks := [[{3,green}, {9,black}], [{2,red}] ]},
+     #{moves := [{[{2,red},{3,green}], '->', []}],
+       previous_stacks := NewPrevStacks2,
+       stacks := [[{9,black}], [{2,red},{3,green}]]}]
+        = ?SS:stack_to_stack_moves(State),
+
+    NewSortedPrevStacks1 = lists:sort(gb_sets:to_list(NewPrevStacks1)) ,
+    ct:pal("~p: NewSortedPrevStacks1~n\t~p~n", [?MODULE, NewSortedPrevStacks1]),
+    ct:pal("~p: PrevStacks1~n\t~p~n", [?MODULE, PrevStacks1]),
+    PrevStacks1 = NewSortedPrevStacks1,
+    NewSortedPrevStacks2 = lists:sort(gb_sets:to_list(NewPrevStacks2)),
+    ct:pal("~p: NewSortedPrevStacks2~n\t~p~n", [?MODULE, NewSortedPrevStacks2]),
+    ct:pal("~p: PrevStacks2~n\t~p~n", [?MODULE, PrevStacks2]),
+    PrevStacks2 = NewSortedPrevStacks2.
 
 test_cards_to_free_moves(_config) ->
     State =
