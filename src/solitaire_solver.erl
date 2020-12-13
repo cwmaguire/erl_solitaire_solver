@@ -42,21 +42,62 @@ maybe_solve(Cards) ->
           {finish, black} => [empty],
           {finish, green} => [empty],
           stacks => Stacks,
-          previous_stacks => Stacks,
+          previous_stacks => gb_sets:from_list(Stacks),
           finished => Finished,
           moves => []},
-    solve_([State], 60000).
+    solve_([State], 10000).
 
 solve_(States, 0) ->
     NumBestGuesses = 2,
-    io:format("Ran out of rounds, fetching ~p best guesses:~n", [NumBestGuesses]),
+    NumStates = length(States),
+    io:format("Ran out of rounds, "
+              "fetching ~p best guesses"
+              " of ~p remaining states:~n",
+              [NumBestGuesses, NumStates]),
     {best_guesses, reversed_moves_sorted_by_length(States, NumBestGuesses)};
+solve_(_NoMoreMoves = [], _Rounds) ->
+    io:format("Ran out of states");
 solve_([State | Rest] = States, Rounds) ->
     case lists:filter(fun is_solved/1, States) of
         [#{moves := Moves} | _] ->
             lists:reverse(Moves);
         _ ->
             NewStates = move(State),
+            %[ct:pal("Moves: ~p~n", [M]) || #{moves := [M | _]} <- NewStates],
+            %[ct:pal("Stacks: ~p~n", [S]) || #{stacks := S} <- NewStates],
+
+            NonFreeMoveStates =
+                [S || S = #{moves := [{_, '->', Target} | _]} <- NewStates, Target /= free],
+            [begin
+                AbbrevMoves = lists:map(fun abbrev_move/1, Moves),
+                AbbrevPrevStacks = lists:map(fun abbrev_stack/1, gb_sets:to_list(PrevStacks)),
+                io:format("Moves: ~p~n"
+                          "Previous stacks: ~p~n",
+                          [AbbrevMoves, AbbrevPrevStacks]),
+                draw_moves(NewState)
+             end || #{moves := Moves,
+                      previous_stacks := PrevStacks} = NewState <- NonFreeMoveStates],
+
+
+            case Rounds rem 50000 of
+                0 ->
+                    %io:format("______________~n"),
+                    %io:format("______________~n");
+                    ok;
+                _ ->
+                    ok
+            end,
+
+            case Rounds rem 100 of
+                0 ->
+                    %NumStates = length(States),
+                    %Gauge = [$| || _ <- lists:seq(1, NumStates div 2)],
+                    %Gauge = [$| || _ <- lists:seq(1, NumStates)],
+                    %io:format("~p (~p)~n", [Gauge, NumStates]);
+                    ok;
+                _ ->
+                    ok
+            end,
 
             %LongMoves = lists:filter(fun(#{moves := Moves}) -> length(Moves) > 30 end, NewStates),
             %StateParts = [maps:with([moves], S) || S <- NewStates],
@@ -119,13 +160,13 @@ move(State) ->
          cards_to_free_moves(State)],
     FlattenedNewStates = lists:flatten(NewStates),
 
-    case FlattenedNewStates of
-        [] ->
-            StacksAndMoves = maps:without([previous_stacks], State),
-            io:format("Ran out of moves:~n~p~n", [StacksAndMoves]);
-        _ ->
-            ok
-    end,
+    % case FlattenedNewStates of
+    %     [] ->
+    %         StacksAndMoves = maps:without([previous_stacks], State),
+    %         io:format("Ran out of moves:~n~p~n", [StacksAndMoves]);
+    %     _ ->
+    %         ok
+    % end,
 
 
     % StateParts = [maps:with([moves], S) || S <- FlattenedNewStates],
@@ -198,12 +239,13 @@ stack_to_stack_move(SubStack,
                       previous_stacks := PrevStacks} = State) ->
     NewTargetStack = SubStack ++ OtherStack,
     NewStacks = [NewSourceStack, NewTargetStack | RestOfStacks],
-    PrevStacks1 =
+    PrevStacks2 =
         case NewSourceStack of
             [] ->
-                [NewTargetStack | PrevStacks];
+                gb_sets:add(NewTargetStack, PrevStacks);
             _ ->
-                [NewSourceStack, NewTargetStack | PrevStacks]
+                PrevStacks1 = gb_sets:add(NewTargetStack, PrevStacks),
+                gb_sets:add(NewSourceStack, PrevStacks1)
         end,
     Move =
         case OtherStack of
@@ -214,7 +256,7 @@ stack_to_stack_move(SubStack,
         end,
     {NewSourceStack,
      State#{moves => [Move | Moves],
-            previous_stacks => PrevStacks1,
+            previous_stacks => PrevStacks2,
             stacks => NewStacks}}.
 
 cards_to_free_moves(#{stacks := Stacks} = State) ->
@@ -232,10 +274,17 @@ card_to_free_move({{free, N}, empty},
                      previous_stacks := PrevStacks} = State) ->
     OtherStacks = lists:delete(Stack, Stacks),
     NewStacks = [RestOfStack | OtherStacks],
+    NewPrevStacks =
+        case RestOfStack of
+            [] ->
+                PrevStacks;
+            NotEmpty ->
+                gb_sets:add(RestOfStack, PrevStacks)
+        end,
     State#{stacks => NewStacks,
            {free, N} => Card,
            moves => [{Card, '->', free} | Moves],
-           previous_stacks => [RestOfStack | PrevStacks]};
+           previous_stacks => NewPrevStacks};
 card_to_free_move(_FreeCell, _Stack, _State) ->
     _InvalidMove = [].
 
@@ -257,7 +306,7 @@ free_to_stack_move({{free, Suit}, Card},
     State#{stacks => [NewStack | OtherStacks],
            {free, Suit} => empty,
            moves => [{Card, '->', hd(Stack)} | Moves],
-           previous_stacks => [NewStack | PrevStacks]}.
+           previous_stacks => gb_sets:add(NewStack, PrevStacks)}.
 
 free_to_finish_moves(State) ->
     FullFreeCells = [Free || Free = {{free, _}, {_, _}} <- maps:to_list(State)],
@@ -300,6 +349,13 @@ card_to_finish_move({{finish, Suit}, [FinCard | _ ] = FinishStack},
         _ ->
             OtherStacks = lists:delete(Stack, Stacks),
             NewStacks = [RestOfStack | OtherStacks],
+            NewPrevStacks =
+                case RestOfStack of
+                    [] ->
+                        _DontTrackEmptyLists = PrevStacks;
+                    NotEmpty ->
+                        gb_sets:add(RestOfStack, PrevStacks)
+                end,
             NewFinishStack =
                 case FinCard of
                     empty ->
@@ -310,7 +366,7 @@ card_to_finish_move({{finish, Suit}, [FinCard | _ ] = FinishStack},
             State#{stacks => NewStacks,
                    {finish, Suit} => NewFinishStack,
                    moves => [{TopStackCard, '->', finish} | Moves],
-                   previous_stacks => [RestOfStack | PrevStacks]}
+                   previous_stacks => NewPrevStacks}
     end;
 card_to_finish_move(_FreeCell, _Stack, _State) ->
     _InvalidMove = [].
@@ -326,12 +382,12 @@ visible_dragons(#{stacks := Stacks} = State) ->
         lists:foldl(fun add_dragon/2, #{}, FreeCards ++ TopCards),
     [N || {N, Count} <- maps:to_list(DragonCounts), Count == 4].
 
-maybe_slay_dragon(DragonNum, State) ->
+maybe_slay_dragon(DragonSuit, State) ->
     HasAvailFreeCell = has_empty_free_cell(State) orelse
-                       has_matching_free_cell_dragon(DragonNum, State),
+                       has_matching_free_cell_dragon(DragonSuit, State),
     case HasAvailFreeCell of
         true ->
-            slay_dragon(DragonNum, State);
+            slay_dragon(DragonSuit, State);
         false ->
             _NoFreeCellAvailable = []
     end.
@@ -344,12 +400,12 @@ is_empty_free_cell({{free, _}, empty}) ->
 is_empty_free_cell(_) ->
     false.
 
-has_matching_free_cell_dragon(DragonNum, State) ->
-    0 < length(dragon_free_cells(DragonNum, State)).
+has_matching_free_cell_dragon(DragonSuit, State) ->
+    0 < length(dragon_free_cells(DragonSuit, State)).
 
-dragon_free_cells(DragonNum, State) ->
-    [FC || FC = {{free, _N}, {dragon, DragonNum_}} <- maps:to_list(State),
-                                                      DragonNum == DragonNum_].
+dragon_free_cells(DragonSuit, State) ->
+    [FC || FC = {{free, _N}, {dragon, DragonSuit_}} <- maps:to_list(State),
+                                                      DragonSuit == DragonSuit_].
 
 add_dragon({dragon, N}, Counts) ->
     CurrentCount = maps:get(N, Counts, 0),
@@ -364,11 +420,12 @@ add_dragon(_NotDragon, Counts) ->
 %%     Oh, but, the new stack with a dragon removed could be
 %%     seen twice since it won't have been recorded when it came
 %%     into existence
-slay_dragon(DragonNum, #{stacks := Stacks,
-                         moves := Moves,
-                         previous_stacks := PrevStacks} = State) ->
+slay_dragon(DragonSuit,
+            #{stacks := Stacks,
+              moves := Moves,
+              previous_stacks := PrevStacks} = State) ->
     {{free, DragonFreeCellNumber}, _} =
-        case dragon_free_cells(DragonNum, State) of
+        case dragon_free_cells(DragonSuit, State) of
             [] ->
                 hd(lists:filter(fun is_empty_free_cell/1, maps:to_list(State)));
             [{{free, _N}, _} = DragonFreeCell | _] ->
@@ -376,19 +433,21 @@ slay_dragon(DragonNum, #{stacks := Stacks,
         end,
     OtherDragonFreeCells =
         [FC || FC = {{free, FN},
-                     {dragon, DN}} <- maps:to_list(State),
+                     {dragon, DS}} <- maps:to_list(State),
                                      DragonFreeCellNumber /= FN,
-                                     DragonNum == DN],
+                                     DragonSuit == DS],
     StacksWithDragons =
-        [S || S = [{dragon, DN} | _] <- Stacks, DragonNum == DN],
+        [S || S = [{dragon, DS} | _] <- Stacks, DragonSuit == DS],
     NewStacks =
-        [Rest || [{dragon, DN} | Rest] <- Stacks, DragonNum == DN],
+        [Rest || [{dragon, DS} | Rest] <- Stacks, DragonSuit == DS, Rest /= []],
     State2 = lists:foldl(fun remove_dragon/2, State, OtherDragonFreeCells ++ StacksWithDragons),
-    State2#{{free, DragonFreeCellNumber} => {slayed_dragon, DragonNum},
-            moves => [{slay, DragonNum} | Moves],
-            previous_stacks => PrevStacks ++ NewStacks}.
+    State2#{{free, DragonFreeCellNumber} => {slayed_dragon, DragonSuit},
+            moves => [{slay, DragonSuit} | Moves],
+            previous_stacks =>
+                gb_sets:union(PrevStacks,
+                              gb_sets:from_list(NewStacks))}.
 
-remove_dragon([{dragon, _DragonNum} | StackTail] = Stack,
+remove_dragon([{dragon, _DragonSuit} | StackTail] = Stack,
               #{stacks := Stacks} = State) ->
     OtherStacks = lists:delete(Stack, Stacks),
     State#{stacks => [StackTail | OtherStacks]};
@@ -401,7 +460,13 @@ poppy_move(#{stacks := Stacks,
     case [S || [{poppy} | _] = S <- Stacks] of
         [[{poppy} | NewStack] = PoppyStack] ->
             Move = {[{poppy}], '->', {poppy}},
-            NewPrevStacks = [NewStack | PrevStacks],
+            NewPrevStacks =
+                case NewStack of
+                    [] ->
+                        PrevStacks;
+                    NotEmpty ->
+                        gb_sets:add(NotEmpty, PrevStacks)
+                end,
             NewStacks = [NewStack | lists:delete(PoppyStack, Stacks)],
             State#{stacks => NewStacks,
                    moves => [Move | Moves],
@@ -412,11 +477,9 @@ poppy_move(#{stacks := Stacks,
 
 is_valid_stack_move({_, _, #{moves := [{[_SingleCard], '->', {free, N}}  | _]} = State}) ->
     FreeN = maps:get({free, N}, State),
-    _CanMoveSingleCardToFreeCellN =
-        FreeN == empty;
+    _CanMoveSingleCardToFreeCellN = (FreeN == empty);
 is_valid_stack_move({_, _, #{moves := [{_MultipleCards, '->', {free, _}}  | _]}}) ->
-    _CanMoveStackToFreeCell =
-        false;
+    _CanMoveStackToFreeCell = false;
 is_valid_stack_move({_, _, #{moves := [{[{1, Suit} =_SingleCard],
                                         '->',
                                         {finished, Suit} = Target}  | _]} = State}) ->
@@ -443,71 +506,170 @@ is_valid_stack_move({_, _, #{moves := [{[{dragon, _}] = _SingleCard,
                                         {finished, _}}  | _]} = _State}) ->
     _CanPutDragonInFinishedPile =
         false;
-is_valid_stack_move({_, _, #{moves := [{MovedStack, '->', _} | _]}} = StackMove) ->
-    NumPoppies = length([P || {poppy} = P <- MovedStack]),
-    NumDragons = length([D || {dragon, _} = D <- MovedStack]),
-    case {NumPoppies, NumDragons} of
-        {0, 0} ->
-            is_valid_stack_move_(StackMove);
-        _ ->
-            _CanMoveStacksContainingDragonsOrPoppies =
-                false
+is_valid_stack_move({_, _, #{moves := [{[{1, _} | _], '->', {Num, _}}  | _]}})
+  when is_integer(Num) ->
+    _CanMove1ToStack = false;
+is_valid_stack_move({_, _, #{moves := [{[{1, _} | _], '->', free}  | _]}}) ->
+    _CanMove1ToFree = false;
+is_valid_stack_move(StackMove) ->
+    is_valid_stack_to_stack_move(StackMove).
+
+is_valid_stack_to_stack_move({_PrevStacks, _, State} = StackMove) ->
+    Functions =
+        [{"not in order", fun is_moved_stack_in_order/1},
+         {"not alternating", fun has_alternating_suits/1},
+         {"dragon in stack", 'not', fun has_dragon_in_stack/1},
+         {"target top dragon", 'not', fun is_target_top_dragon/1},
+         {"top not sequential", fun is_target_top_sequential/1},
+         {"top same suit", fun is_target_top_different_suit/1},
+         {"target top poppy", 'not', fun is_target_top_poppy/1},
+         {"poppy in stack", 'not', fun has_poppy_in_stack/1},
+         {"backtrack", 'not', fun is_backtracking/1}],
+
+    %#{moves := [Move | _] = Moves} = State,
+    %AbbrevMoves = lists:map(fun abbrev_move/1, Moves),
+    %AbbrevPrevStacks = lists:map(fun abbrev_stack/1, gb_sets:to_list(PrevStacks)),
+    %io:format("Running validators against move: ~p~n"
+    %          "All moves: ~p~n"
+    %          "Previous stacks: ~p~n",
+    %          [Move, AbbrevMoves, AbbrevPrevStacks]),
+
+    IsValid = lists:foldl(fun maybe_run_validator/2, StackMove, Functions),
+    case IsValid of
+        false ->
+            %draw_moves(State),
+            false;
+        _StackMove ->
+            true
     end.
 
-is_valid_stack_move_({PrevStacks,
-                      NewSourceStack,
-                      #{moves := [{MovedStack, '->', Target} | _],
-                        stacks := Stacks} = _State}) ->
+maybe_run_validator({_, _ValidatorFun}, _IsStillValid = false) ->
+    false;
+maybe_run_validator({_, _, _ValidatorFun}, _IsStillValid = false) ->
+    false;
+maybe_run_validator({_Name, 'not', ValidatorFun}, StackMove) ->
+    case ValidatorFun(StackMove) of
+        false ->
+            StackMove;
+        true ->
+            %io:format("IsValid failed at not ~p~n", [Name]),
+            false
+    end;
+maybe_run_validator({_Name, ValidatorFun}, StackMove) ->
+    case ValidatorFun(StackMove) of
+        true ->
+            StackMove;
+        false ->
+            %io:format("IsValid failed at ~p~n", [Name]),
+            false
+    end.
+
+has_dragon_in_stack({_, _, State}) ->
+    has_card_in_stack(dragon, State).
+
+has_poppy_in_stack({_, _, State}) ->
+    has_card_in_stack(poppy, State).
+
+has_card_in_stack(CardType, State) ->
+    #{moves := [{MovedStack, '->', _} | _]} = State,
+    [] /= [Card || Card <- MovedStack, CardType == element(1, Card)].
+
+is_backtracking({PrevStacks,
+                 NewSourceStack,
+                 #{moves := [{MovedStack, '->', _Target} | _] = Moves,
+                   stacks := Stacks} = State}) ->
     OrigTargetStack = get_orig_target_stack(MovedStack, Stacks),
     UpdatedTargetStack = MovedStack ++ OrigTargetStack,
-    ModifiedStacks = [NewSourceStack, UpdatedTargetStack],
-    IsBackTrackingFun = fun(Stack) -> lists:member(Stack, ModifiedStacks) end,
-    IsBacktracking =
-        case Target of
-            {finish, _} ->
-                _IsBacktrackingToFinishACard = false;
-            _ ->
-                lists:any(IsBackTrackingFun, PrevStacks)
-        end,
-    Numbers = [N || {N, _Suit} <- MovedStack],
-    IsInOrder = (Numbers == lists:sort(Numbers)),
-    HasAlternatingSuits = has_alternating_suits(MovedStack),
-    {SourceNumber, SourceSuit} = _BottomMoved = lists:last(MovedStack),
-    AreStacksCompatible =
-        case OrigTargetStack of
-            [] ->
-                _CanMoveStackIntoEmptyStackSpace =
-                    true;
-            [{poppy} = _OldTop | _] ->
-                _CanMoveStackOntoPoppy =
-                    false;
-            [{dragon, _} = _OldTop | _] ->
-                _CanMoveStackOntoDragon =
-                    false;
-            [{TargetNumber, TargetSuit} = _OldTop | _] ->
-                AreSequential = (SourceNumber + 1 == TargetNumber),
-                AreDifferentSuits = (SourceSuit /= TargetSuit),
-                AreSequential andalso AreDifferentSuits
-        end,
+    %ModifiedStacks = [NewSourceStack, UpdatedTargetStack],
+    %IsBacktracking = are_previous_stacks(ModifiedStacks, PrevStacks),
+    IsBacktracking = gb_sets:is_member(UpdatedTargetStack, PrevStacks),
+    case IsBacktracking of
+        true ->
+            AbbrevMoves = lists:map(fun abbrev_move/1, Moves),
+            AbbrevPrevStacks = lists:map(fun abbrev_stack/1, gb_sets:to_list(PrevStacks)),
+            io:format("***** Backtracking *****~n"
+                      "New Source: ~p~n"
+                      "New Target: ~p~n"
+                      "Moves: ~p~n"
+                      "Previous stacks: ~p~n",
+                      [abbrev_stack(NewSourceStack),
+                       abbrev_stack(UpdatedTargetStack),
+                       AbbrevMoves,
+                       AbbrevPrevStacks]),
+            draw_moves(State),
+            true;
+        false ->
+            false
+    end.
 
-    not IsBacktracking and
-        IsInOrder and
-        HasAlternatingSuits and
-        AreStacksCompatible.
+is_moved_stack_in_order({_, _, State}) ->
+    #{moves := [{MovedStack, '->', _} | _]} = State,
+    Numbers = [N || {N, _} <- MovedStack, is_integer(N)],
+    Numbers == lists:sort(Numbers).
+
+has_alternating_suits({_, _, #{moves := [{MovedStack, _, _} | _]}}) ->
+    has_alternating_suits_(MovedStack).
+
+has_alternating_suits_([_]) ->
+    true;
+has_alternating_suits_([{_, Suit}, {_, Suit} | _]) ->
+    false;
+has_alternating_suits_([_ | Rest]) ->
+    has_alternating_suits_(Rest).
+
+is_target_top_dragon({_, _, State}) ->
+    #{moves := [{MovedStack, _, _} | _],
+      stacks := Stacks} = State,
+    case get_orig_target_stack(MovedStack, Stacks) of
+        [{dragon, _} | _] ->
+            true;
+        _ ->
+            false
+    end.
+
+is_target_top_poppy({_, _, State}) ->
+    #{moves := [{MovedStack, _, _} | _],
+      stacks := Stacks} = State,
+    case get_orig_target_stack(MovedStack, Stacks) of
+        [{poppy} | _] ->
+            true;
+        _ ->
+            false
+    end.
+
+is_target_top_sequential({_, _, State}) ->
+    #{moves := [{MovedStack, _, _} | _],
+      stacks := Stacks} = State,
+    TargetStack = get_orig_target_stack(MovedStack, Stacks),
+    case {lists:last(MovedStack), TargetStack} of
+        {{Num, _}, [{NumPlusOne, _} | _]} when (Num + 1) == NumPlusOne ->
+            true;
+        _ ->
+            false
+    end.
+
+is_target_top_different_suit({_, _, State}) ->
+    #{moves := [{MovedStack, _, _} | _],
+      stacks := Stacks} = State,
+    TargetStack = get_orig_target_stack(MovedStack, Stacks),
+    case {lists:last(MovedStack), TargetStack} of
+        {{_, Suit1}, [{_, Suit2} | _]} when Suit1 /= Suit2 ->
+            true;
+        _ ->
+            false
+    end.
 
 get_orig_target_stack([X | _] = Addition, [[X | _] = Stack | _Rest]) ->
     lists:subtract(Stack, Addition);
 get_orig_target_stack([_ | _] = Addition, [_ | Rest]) ->
     get_orig_target_stack(Addition, Rest).
 
-has_alternating_suits([]) ->
-    true;
-has_alternating_suits([_]) ->
-    true;
-has_alternating_suits([{_, Suit}, {_, Suit} | _]) ->
-    false;
-has_alternating_suits([_ | Rest]) ->
-    has_alternating_suits(Rest).
+are_previous_stacks(NewStacks, PrevStacks) ->
+    IsPrevStackFun =
+        fun(Stack) ->
+            gb_sets:is_member(Stack, PrevStacks)
+        end,
+    lists:any(IsPrevStackFun, NewStacks).
 
 sub_stacks([]) ->
     [];
@@ -628,11 +790,12 @@ is_dragon(_) ->
 draw_moves(State) ->
     StackLines = stack_lines(State),
     FreeLine = free_line(State),
-    io:format(user, "FreeLine = ~p~n", [iolist_to_binary(FreeLine)]),
+    %io:format(user, "FreeLine = ~p~n", [iolist_to_binary(FreeLine)]),
     FinishedLine = finished_line(State),
-    io:format(user, "FinishedLine = ~p~n", [iolist_to_binary(FinishedLine)]),
+    %io:format(user, "FinishedLine = ~p~n", [iolist_to_binary(FinishedLine)]),
     Merged = merge_lines(StackLines, [FreeLine, FinishedLine], []),
-    [io:format("~p~n", [iolist_to_binary(Line)]) || Line <- Merged].
+    [io:format("~p", [iolist_to_binary(Line)]) || Line <- Merged],
+    io:format("~n").
 
 merge_lines([], [], Merged) ->
     lists:reverse(Merged);
@@ -667,17 +830,26 @@ fin_head({{finish, Suit}, [{Num, _Suit} | _]}) ->
     [<<" ">>, a2b(Suit), <<":[">>, i2b(Num), a2b(Suit), <<"] ">>].
 
 stack_lines(#{stacks := Stacks}) ->
-    OrdStacks = lists:sort(fun sort_stacks/2, Stacks),
+    OrdStacks = lists:sort(fun sort_stacks_by_last/2, Stacks),
     stack_lines(OrdStacks, _Lines = []).
 
+sort_stacks_by_last(Stack1, Stack2) ->
+    sort_stacks(lists:reverse(Stack1), lists:reverse(Stack2)).
+
 sort_stacks([], _) ->
-    _StacksToRight = false;
+    _EmptyStackOnRight = false;
 sort_stacks(_, []) ->
-    _StacksToRight = true;
-sort_stacks([X | _], [Y | _]) when X < Y ->
-    true;
+    _EmptyStackOnRight = true;
+sort_stacks([{X, _} | _], [{Y, _} | _]) when is_integer(X), is_integer(Y) ->
+    _NaturalOrderOfInts = X < Y;
+sort_stacks([{X, _} | _], _) when is_integer(X) ->
+    _IsIntBeforeNonInt = true;
+sort_stacks(_, [{Y, _} | _]) when is_integer(Y) ->
+    _IsIntBeforeNonInt = false;
+sort_stacks([X | _], [Y | _]) ->
+    _NaturalOrderOfNonInts = X < Y;
 sort_stacks(_, _) ->
-    false.
+    true.
 
 stack_lines(Stacks, Lines) ->
     case length(lists:flatten(Stacks)) == 0 of
@@ -710,3 +882,32 @@ a2b(A) ->
 
 i2b(I) ->
     integer_to_binary(I).
+
+abbrev_move({Num, Suit} = _Card) when is_integer(Num), is_atom(Suit) ->
+    abbrev_card({Num, Suit});
+abbrev_move({slay, Suit}) when is_atom(Suit) ->
+    AtomStr = hd(atom_to_list(Suit)),
+    list_to_atom(lists:flatten(["slay_", AtomStr]));
+abbrev_move({SingleCard = {_, _}, '->', TargetCard}) ->
+    {abbrev_card(SingleCard), '->', abbrev_card(TargetCard)};
+abbrev_move({Cards, '->', TargetCard}) when is_list(Cards) ->
+    {lists:map(fun abbrev_card/1, Cards),
+     '->',
+     abbrev_card(TargetCard)}.
+
+abbrev_card({Num, Suit}) when is_integer(Num), is_atom(Suit) ->
+    NumStr = integer_to_list(Num),
+    AtomStr = hd(atom_to_list(Suit)),
+    list_to_atom(lists:flatten([NumStr, AtomStr]));
+abbrev_card({dragon, Suit}) when is_atom(Suit) ->
+    AtomStr = hd(atom_to_list(Suit)),
+    list_to_atom(lists:flatten(["d", AtomStr]));
+abbrev_card({poppy}) ->
+    pp;
+abbrev_card(Atom) when is_atom(Atom) ->
+    Atom;
+abbrev_card(_EmptyStack = []) ->
+    [].
+
+abbrev_stack(Cards) ->
+    lists:map(fun abbrev_card/1, Cards).

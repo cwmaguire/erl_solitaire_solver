@@ -9,7 +9,6 @@
 -export([test_poppy_move/1]).
 -export([test_multi_substacks/1]).
 -export([test_stack_to_stack_moves/1]).
--export([test_remove_substack/1]).
 -export([test_cards_to_free_moves/1]).
 -export([test_slay_dragon_moves/1]).
 -export([test_visible_dragons/1]).
@@ -22,37 +21,34 @@
 -export([test_remove_dragon/1]).
 -export([test_is_valid_stack_move/1]).
 -export([test_get_orig_target_stack/1]).
--export([test_remove_stack/1]).
 -export([test_sub_stacks/1]).
 -export([test_has_alternating_suits/1]).
 
 -define(SS, solitaire_solver).
-%all() ->
-    %[test_solve].
-
 all() ->
-    [test_solve,
-     test_free_to_finish_moves,
-     test_cards_to_finish_moves,
-     test_poppy_move,
-     test_multi_substacks,
-     test_stack_to_stack_moves,
-     test_remove_substack,
-     test_cards_to_free_moves,
-     test_slay_dragon_moves,
-     test_visible_dragons,
-     test_maybe_slay_dragon,
-     test_has_empty_free_cell,
-     test_has_matching_free_cell_dragon,
-     test_dragon_free_cells,
-     test_add_dragon,
-     test_slay_dragon,
-     test_remove_dragon,
-     test_is_valid_stack_move,
-     test_get_orig_target_stack,
-     test_remove_stack,
-     test_has_alternating_suits,
-     test_sub_stacks].
+    [test_solve].
+
+%all() ->
+    %[test_solve,
+     %test_free_to_finish_moves,
+     %test_cards_to_finish_moves,
+     %test_poppy_move,
+     %test_multi_substacks,
+     %test_stack_to_stack_moves,
+     %test_cards_to_free_moves,
+     %test_slay_dragon_moves,
+     %test_visible_dragons,
+     %test_maybe_slay_dragon,
+     %test_has_empty_free_cell,
+     %test_has_matching_free_cell_dragon,
+     %test_dragon_free_cells,
+     %test_add_dragon,
+     %test_slay_dragon,
+     %test_remove_dragon,
+     %test_is_valid_stack_move,
+     %test_get_orig_target_stack,
+     %test_has_alternating_suits,
+     %test_sub_stacks].
 
 % Saving this here because I don't want to look it up again
 %dbg:tracer(),
@@ -65,47 +61,48 @@ test_solve(_Config) ->
     %dbg:p(all, call),
     %dbg:tpl(solitaire_solver, card_to_finish_moves, [{'_', [], [{return_trace}]}]),
     Cards =
-        [[{4, black},
-          {dragon, 1}, % 1 = black
-          {dragon, 2}, % 2 = red
-          {5, green},
-          {2, red}],
-         [{dragon, 1},
-          {dragon, 2},
-          {9, black},
-          {1, green},
-          {dragon, 3}], % 3 = green
-         [{8, green},
-          {1, black},
-          {dragon, 1},
-          {dragon, 3},
-          {6, black}],
-         [{4, green},
-          {7, red},
-          {2, green},
-          {3, black},
-          {4, red}],
-         [{dragon, 3},
-          {1, red},
-          {8, red},
-          {3, red},
-          {dragon, 2}],
-         [{2, black},
-          {3, green},
-          {6, red},
-          {dragon, 3},
-          {dragon, 1}],
-         [{7, green},
-          {dragon, 2},
-          {9, red},
-          {7, black},
-          {6, green}],
-         [{5, red},
-          {9, green},
-          {poppy},
-          {5, black},
-          {8, black}]],
+        [{4, black},
+         {dragon, black}, % 1 = black
+         {dragon, red}, % 2 = red
+         {5, green},
+         {2, red},
+         {dragon, black},
+         {dragon, red},
+         {9, black},
+         {1, green},
+         {dragon, green}, % 3 = green
+         {8, green},
+         {1, black},
+         {dragon, black},
+         {dragon, green},
+         {6, black},
+         {4, green},
+         {7, red},
+         {2, green},
+         {3, black},
+         {4, red},
+         {dragon, green},
+         {1, red},
+         {8, red},
+         {3, red},
+         {dragon, red},
+         {2, black},
+         {3, green},
+         {6, red},
+         {dragon, green},
+         {dragon, black},
+         {7, green},
+         {dragon, red},
+         {9, red},
+         {7, black},
+         {6, green},
+         {5, red},
+         {9, green},
+         {poppy},
+         {5, black},
+         {8, black}],
     MoveLists = ?SS:solve(Cards),
+    ct:pal("~p: MoveLists~n\t~p~n", [?MODULE, MoveLists]),
 
 	ExpectedLists =
         [{[{4,black}],'->',{5,red}},
@@ -229,7 +226,7 @@ test_cards_to_finish_moves(_Config) ->
           {finish, green} => [empty],
           stacks => Stacks1,
           moves => [],
-          previous_stacks => Stacks1},
+          previous_stacks => gb_sets:from_list(Stacks1)},
     [[], [], #{{finish, red} := [{1, red}]}] =
         ?SS:cards_to_finish_moves(State1),
 
@@ -240,7 +237,7 @@ test_cards_to_finish_moves(_Config) ->
           {finish, green} => [empty],
           stacks => Stacks2,
           moves => [],
-          previous_stacks => Stacks2},
+          previous_stacks => gb_sets:from_list(Stacks2)},
     [[], [], []] = ?SS:cards_to_finish_moves(State2),
 
     Stacks3 = [[{2, red}]],
@@ -250,7 +247,7 @@ test_cards_to_finish_moves(_Config) ->
           {finish, green} => [empty],
           stacks => Stacks3,
           moves => [],
-          previous_stacks => Stacks3},
+          previous_stacks => gb_sets:from_list(Stacks3)},
     [[], [], #{{finish, red} := [{2, red}, {1, red}]}] =
         ?SS:cards_to_finish_moves(State3),
 
@@ -261,7 +258,7 @@ test_cards_to_finish_moves(_Config) ->
           {finish, green} => [empty],
           stacks => Stacks4,
           moves => [],
-          previous_stacks => Stacks4},
+          previous_stacks => gb_sets:from_list(Stacks4)},
     [[], [], []] =
         ?SS:cards_to_finish_moves(State4),
 
@@ -275,12 +272,12 @@ test_poppy_move(_Config) ->
         [[{poppy}, {9, red}],
          [{3, black}, {2, black}]],
     PrevStacks =
-        [[{9, red}],
-         [{poppy}, {9, red}],
-         [{3, black}, {2, black}]],
+        gb_sets:from_list([[{9, red}],
+                           [{poppy}, {9, red}],
+                           [{3, black}, {2, black}]]),
     Move = {[{poppy}], '->', {poppy}},
     State = #{stacks => Stacks,
-              previous_stacks => Stacks,
+              previous_stacks => gb_sets:from_list(Stacks),
               moves => []},
 
     #{stacks := NewStacks,
@@ -334,40 +331,33 @@ test_stack_to_stack_moves(_Config) ->
     State =
         #{stacks => Stacks,
           moves => [],
-          previous_stacks => Stacks},
+          previous_stacks => gb_sets:from_list(Stacks)},
 
+    PrevStacks1 =
+        gb_sets:from_list([[{9,black}],
+                           [{1,red},{2,green},{3,black},{4,red},{5,green}],
+                           [{1,red},{2,green},{9,black}],
+                           [{3,black},{4,red},{5,green}],
+                           [{6,black},{7,red},{8,green}]]),
+    PrevStacks2 =
+        gb_sets:from_list([[{3,black},{4,red},{5,green},{6,black},{7,red},{8,green}],
+                           [{1,red},{2,green},{9,black}],
+                           [{3,black},{4,red},{5,green}],
+                           [{6,black},{7,red},{8,green}]]),
+    Moves = ?SS:stack_to_stack_moves(State),
+    ct:pal("~p: Moves~n\t~p~n", [?MODULE, Moves]),
 
 	[#{moves := [{[{1,red},{2,green}],'->',{3,black}}],
-           previous_stacks :=
-               [[{9,black}],
-                [{1,red},{2,green},{3,black},{4,red},{5,green}],
-                [{1,red},{2,green},{9,black}],
-                [{3,black},{4,red},{5,green}],
-                [{6,black},{7,red},{8,green}]],
-           stacks :=
-               [[{9,black}],
-                [{1,red},{2,green},{3,black},{4,red},{5,green}],
-                [{6,black},{7,red},{8,green}]]},
-         #{moves := [{[{3,black},{4,red},{5,green}],'->',{6,black}}],
-           previous_stacks :=
-               [[{3,black},{4,red},{5,green},{6,black},{7,red},{8,green}],
-                [{1,red},{2,green},{9,black}],
-                [{3,black},{4,red},{5,green}],
-                [{6,black},{7,red},{8,green}]],
-           stacks :=
-               [[],
-                [{3,black},{4,red},{5,green},{6,black},{7,red},{8,green}],
-                [{1,red},{2,green},{9,black}]]}]
+       previous_stacks := PrevStacks1,
+       stacks := [[{9,black}],
+                  [{1,red},{2,green},{3,black},{4,red},{5,green}],
+                  [{6,black},{7,red},{8,green}]]},
+     #{moves := [{[{3,black},{4,red},{5,green}],'->',{6,black}}],
+       previous_stacks := PrevStacks2,
+       stacks := [[],
+                  [{3,black},{4,red},{5,green},{6,black},{7,red},{8,green}],
+                  [{1,red},{2,green},{9,black}]]}]
         = ?SS:stack_to_stack_moves(State).
-
-
-test_remove_substack(_Config) ->
-    Stacks = [[{1, red}, {2, green}],
-              [{3, black}, {4, red}, {5, green}],
-              [{6, black}, {7, red}, {8, green}]],
-    [{5, green}] = ?SS:remove_substack([{3, black}, {4, red}], Stacks),
-    [{4, red}, {5, green}] = ?SS:remove_substack([{3, black}], Stacks),
-    [] = ?SS:remove_substack([{1, red}, {2, green}], Stacks).
 
 test_cards_to_free_moves(_config) ->
     State =
@@ -377,7 +367,7 @@ test_cards_to_free_moves(_config) ->
           stacks => [[{2, black}],
                      [{3, green}, {4, red}]],
           moves => [],
-          previous_stacks => []},
+          previous_stacks => gb_sets:new()},
 
 	[#{moves := [{{2, black}, '->', free}],
        stacks := [[], [{3, green}, {4, red}]],
@@ -396,133 +386,133 @@ test_slay_dragon_moves(_Config) ->
     [] = ?SS:slay_dragon_moves(StateWithNoSlayableDragons),
 
     StateWithOneSlayableDragons1 =
-        #{{free, 1} => {dragon, 1},
-          stacks => [[{dragon, 1}],
-                     [{dragon, 1}],
-                     [{dragon, 1}]],
+        #{{free, 1} => {dragon, black},
+          stacks => [[{dragon, black}],
+                     [{dragon, black}],
+                     [{dragon, black}]],
           moves => [],
-          previous_stacks => []},
-    [#{{free, 1} := {slayed_dragon, 1},
+          previous_stacks => gb_sets:new()},
+    [#{{free, 1} := {slayed_dragon, black},
        stacks := [[], [], []],
-       moves := [{slay, 1}]}] =
+       moves := [{slay, black}]}] =
         ?SS:slay_dragon_moves(StateWithOneSlayableDragons1),
 
     StateWithOneSlayableDragons2 =
-        #{{free, 1} => {dragon, 1},
-          {free, 2} => {dragon, 1},
-          stacks => [[{dragon, 1}],
-                     [{dragon, 1}],
+        #{{free, 1} => {dragon, black},
+          {free, 2} => {dragon, black},
+          stacks => [[{dragon, black}],
+                     [{dragon, black}],
                      [{2, red}]],
           moves => [],
-          previous_stacks => []},
+          previous_stacks => gb_sets:new()},
     [State = #{{free, 1} := _,
                {free, 2} := __,
                stacks := Stacks,
-               moves := [{slay, 1}]}] =
+               moves := [{slay, black}]}] =
         ?SS:slay_dragon_moves(StateWithOneSlayableDragons2),
 
-    [empty, {slayed_dragon, 1}] =
+    [empty, {slayed_dragon, black}] =
         lists:sort([V || {{free, _}, V} <- maps:to_list(State)]),
     [[], [], [{2, red}]] = lists:sort(Stacks).
 
 test_visible_dragons(_Config) ->
     State1 =
-        #{{free, 1} => {dragon, 1},
-          {free, 2} => {dragon, 2},
+        #{{free, 1} => {dragon, black},
+          {free, 2} => {dragon, red},
           {free, 3} => empty,
-          stacks => [[{1, red}, {2, green}, {dragon, 1}],
-                     [{3, black}, {4, red}, {dragon, 1}],
-                     [{dragon, 3}, {dragon, 1}],
+          stacks => [[{1, red}, {2, green}, {dragon, black}],
+                     [{3, black}, {4, red}, {dragon, black}],
+                     [{dragon, green}, {dragon, black}],
                      _EmptyStack = []],
           moves => [],
-          previous_stacks => []},
+          previous_stacks => gb_sets:new()},
 
     [] = ?SS:visible_dragons(State1),
 
     State2 =
-        #{{free, 1} => {dragon, 1},
-          {free, 2} => {dragon, 1},
+        #{{free, 1} => {dragon, black},
+          {free, 2} => {dragon, black},
           {free, 3} => empty,
-          stacks => [[{dragon, 1}, {1, red}, {2, green}],
-                     [{dragon, 1}, {3, black}, {4, red}],
-                     [{dragon, 2}],
+          stacks => [[{dragon, black}, {1, red}, {2, green}],
+                     [{dragon, black}, {3, black}, {4, red}],
+                     [{dragon, red}],
                      _EmptyStack = []],
           moves => [],
-          previous_stacks => []},
+          previous_stacks => gb_sets:new()},
 
-    [1] = ?SS:visible_dragons(State2),
+    [black] = ?SS:visible_dragons(State2),
 
     State3 =
-        #{{free, 1} => {dragon, 1},
-          {free, 2} => {dragon, 1},
-          {free, 3} => {dragon, 2},
-          stacks => [[{dragon, 1}, {1, red}, {2, green}],
-                     [{dragon, 1}, {3, black}, {4, red}],
-                     [{dragon, 2}, {5, gree}, {6, black}],
-                     [{dragon, 2}],
-                     [{dragon, 2}],
+        #{{free, 1} => {dragon, black},
+          {free, 2} => {dragon, black},
+          {free, 3} => {dragon, red},
+          stacks => [[{dragon, black}, {1, red}, {2, green}],
+                     [{dragon, black}, {3, black}, {4, red}],
+                     [{dragon, red}, {5, gree}, {6, black}],
+                     [{dragon, red}],
+                     [{dragon, red}],
                      _EmptyStack = []],
           moves => [],
-          previous_stacks => []},
+          previous_stacks => gb_sets:new()},
 
-    [1, 2] = lists:sort(?SS:visible_dragons(State3)).
+    [black, red] = lists:sort(?SS:visible_dragons(State3)).
 
 
 test_maybe_slay_dragon(_Config) ->
     StateWithZeroAvailFreeCells
-       = #{stacks => [[{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 2}],
+       = #{stacks => [[{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, red}],
                       [{green, 9}]],
-           {free, 1} => {dragon, 3},
+           {free, 1} => {dragon, green},
            {free, 2} => {1, red},
-           {free, 3} => {dragon, 2},
+           {free, 3} => {dragon, red},
            moves => []},
-    [] = ?SS:maybe_slay_dragon(1, StateWithZeroAvailFreeCells),
+    [] = ?SS:maybe_slay_dragon(black, StateWithZeroAvailFreeCells),
 
     StateWithEmptyFreeCell
-       = #{stacks => [[{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 2}],
+       = #{stacks => [[{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, red}],
                       [{green, 9}]],
            {free, 1} => empty,
            {free, 2} => {1, red},
-           {free, 3} => {dragon, 2},
+           {free, 3} => {dragon, red},
            moves => [],
-           previous_stacks => []},
-    #{{free, 1} := {slayed_dragon, 1},
+           previous_stacks => gb_sets:new()},
+    #{{free, 1} := {slayed_dragon, black},
       {free, 2} := {1, red},
-      {free, 3} := {dragon, 2},
+      {free, 3} := {dragon, red},
       stacks := Stacks1,
-      moves := [{slay, 1}]} =
-        ?SS:maybe_slay_dragon(1, StateWithEmptyFreeCell),
+      moves := [{slay, black}]} =
+        ?SS:maybe_slay_dragon(black, StateWithEmptyFreeCell),
 
-    [[], [], [], [], [{dragon, 2}], [{green, 9}]] = lists:sort(Stacks1),
+    [[], [], [], [], [{dragon, red}], [{green, 9}]] = lists:sort(Stacks1),
 
     StateWithFreeCellMatchingDragon
        = #{stacks => [[{1, red}],
-                      [{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 2}],
+                      [{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, red}],
                       [{9, green}]],
-           {free, 1} => {dragon, 1},
+           {free, 1} => {dragon, black},
            {free, 2} => {1, red},
-           {free, 3} => {dragon, 2},
+           {free, 3} => {dragon, red},
            moves => [],
-           previous_stacks => []},
-    #{{free, 1} := {slayed_dragon, 1},
+           previous_stacks => gb_sets:new()},
+    #{{free, 1} := {slayed_dragon, black},
       {free, 2} := {1, red},
-      {free, 3} := {dragon, 2},
+      {free, 3} := {dragon, red},
       stacks := Stacks2,
-      moves := [{slay, 1}]} =
-        ?SS:maybe_slay_dragon(1, StateWithFreeCellMatchingDragon),
+      moves := [{slay, black}]} =
+        ?SS:maybe_slay_dragon(black, StateWithFreeCellMatchingDragon),
 
-    [[], [], [], [{1, red}], [{9, green}], [{dragon, 2}]] =
+    [[], [], [], [{1, red}], [{9, green}], [{dragon, red}]] =
         lists:sort(Stacks2).
 
 test_has_empty_free_cell(_Config) ->
@@ -534,127 +524,127 @@ test_has_empty_free_cell(_Config) ->
                                      {free, 2} => empty}).
 
 test_has_matching_free_cell_dragon(_Config) ->
-    false = ?SS:has_matching_free_cell_dragon(1, #{}),
-    true = ?SS:has_matching_free_cell_dragon(1, #{{free, 1} => {dragon, 1}}).
+    false = ?SS:has_matching_free_cell_dragon(black, #{}),
+    true = ?SS:has_matching_free_cell_dragon(black, #{{free, 1} => {dragon, black}}).
 
 test_dragon_free_cells(_Config) ->
     State = #{{free, 1} => empty,
-              {free, 2} => {dragon, 1},
-              {free, 3} => {dragon, 2},
+              {free, 2} => {dragon, black},
+              {free, 3} => {dragon, red},
               finished => {3, green},
-              stacks => [[{1, red}], [{dragon, 3}, {2, black}]],
+              stacks => [[{1, red}], [{dragon, green}, {2, black}]],
               moves => [{[{1, green}], '->', [{2, black}]}]},
 
-    [{{free, 3}, {dragon, 2}}] = ?SS:dragon_free_cells(2, State).
+    [{{free, 3}, {dragon, red}}] = ?SS:dragon_free_cells(red, State).
 
 test_add_dragon(_Config) ->
-    Counts = #{1 => 0, 2 => 1, 3 => 2, foo => bar},
-    #{1 := 1} = ?SS:add_dragon({dragon, 1}, Counts),
-    #{2 := 2} = ?SS:add_dragon({dragon, 2}, Counts),
-    #{3 := 3} = ?SS:add_dragon({dragon, 3}, Counts),
-    #{4 := 1} = ?SS:add_dragon({dragon, 4}, Counts),
+    Counts = #{black => 0, red => 1, green => 2, foo => bar},
+    #{black := 1} = ?SS:add_dragon({dragon, black}, Counts),
+    #{red := 2} = ?SS:add_dragon({dragon, red}, Counts),
+    #{green := 3} = ?SS:add_dragon({dragon, green}, Counts),
+    #{pink := 1} = ?SS:add_dragon({dragon, pink}, Counts),
     #{} = ?SS:add_dragon({1, red}, Counts).
 
 test_slay_dragon(_Config) ->
     StateWithDragonInZeroFreeCells
-       = #{stacks => [[{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 2}],
+       = #{stacks => [[{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, red}],
                       [{green, 9}]],
            {free, 1} => empty,
            {free, 2} => {1, red},
-           {free, 3} => {dragon, 2},
+           {free, 3} => {dragon, red},
            moves => [],
-           previous_stacks => []},
-    #{{free, 1} := {slayed_dragon, 1},
+           previous_stacks => gb_sets:new()},
+    #{{free, 1} := {slayed_dragon, black},
       {free, 2} := {1, red},
-      {free, 3} := {dragon, 2},
+      {free, 3} := {dragon, red},
       stacks := Stacks1,
-      moves := [{slay, 1}]} =
-        ?SS:slay_dragon(1, StateWithDragonInZeroFreeCells),
+      moves := [{slay, black}]} =
+        ?SS:slay_dragon(black, StateWithDragonInZeroFreeCells),
 
-    [[], [], [], [], [{dragon, 2}], [{green, 9}]] =
+    [[], [], [], [], [{dragon, red}], [{green, 9}]] =
         lists:sort(Stacks1),
 
     StateWithDragonInOneFreeCell
-       = #{stacks => [[{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 2}],
+       = #{stacks => [[{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, red}],
                       [{green, 9}]],
-           {free, 1} => {dragon, 1},
+           {free, 1} => {dragon, black},
            {free, 2} => {1, red},
-           {free, 3} => {dragon, 2},
+           {free, 3} => {dragon, red},
            moves => [],
-           previous_stacks => []},
-    #{{free, 1} := {slayed_dragon, 1},
+           previous_stacks => gb_sets:new()},
+    #{{free, 1} := {slayed_dragon, black},
       {free, 2} := {1, red},
-      {free, 3} := {dragon, 2},
+      {free, 3} := {dragon, red},
       stacks := Stacks2,
-      moves := [{slay, 1}]} =
-        ?SS:slay_dragon(1, StateWithDragonInOneFreeCell),
+      moves := [{slay, black}]} =
+        ?SS:slay_dragon(black, StateWithDragonInOneFreeCell),
 
-    [[], [], [], [{dragon, 2}], [{green, 9}]] =
+    [[], [], [], [{dragon, red}], [{green, 9}]] =
         lists:sort(Stacks2),
 
     StateWithDragonInTwoFreeCells
        = #{stacks => [[{black, 7}],
-                      [{dragon, 1}],
-                      [{dragon, 1}],
-                      [{dragon, 2}],
+                      [{dragon, black}],
+                      [{dragon, black}],
+                      [{dragon, red}],
                       [{green, 9}]],
-           {free, 1} => {dragon, 1},
-           {free, 2} => {dragon, 1},
-           {free, 3} => {dragon, 2},
+           {free, 1} => {dragon, black},
+           {free, 2} => {dragon, black},
+           {free, 3} => {dragon, red},
            moves => [],
-           previous_stacks => []},
+           previous_stacks => gb_sets:new()},
     #{{free, 1} := Free1Value,
       {free, 2} := Free2Value,
-      {free, 3} := {dragon, 2},
+      {free, 3} := {dragon, red},
       stacks := Stacks3,
-      moves := [{slay, 1}]} =
-        ?SS:slay_dragon(1, StateWithDragonInTwoFreeCells),
+      moves := [{slay, black}]} =
+        ?SS:slay_dragon(black, StateWithDragonInTwoFreeCells),
 
-    [[], [], [{black, 7}], [{dragon, 2}], [{green, 9}]] =
+    [[], [], [{black, 7}], [{dragon, red}], [{green, 9}]] =
         lists:sort(Stacks3),
 
-    [empty, {slayed_dragon, 1}] = lists:sort([Free1Value, Free2Value]),
+    [empty, {slayed_dragon, black}] = lists:sort([Free1Value, Free2Value]),
 
     StateWithDragonInThreeFreeCells
        = #{stacks => [[{black, 7}],
                       [{red, 5}],
-                      [{dragon, 1}],
-                      [{dragon, 2}],
+                      [{dragon, black}],
+                      [{dragon, red}],
                       [{green, 9}]],
-           {free, 1} => {dragon, 1},
-           {free, 2} => {dragon, 1},
-           {free, 3} => {dragon, 1},
+           {free, 1} => {dragon, black},
+           {free, 2} => {dragon, black},
+           {free, 3} => {dragon, black},
            moves => [],
-           previous_stacks => []},
+           previous_stacks => gb_sets:new()},
     #{{free, 1} := Free1Value,
       {free, 2} := Free2Value,
       {free, 3} := Free3Value,
       stacks := Stacks4,
-      moves := [{slay, 1}]} =
-        ?SS:slay_dragon(1, StateWithDragonInThreeFreeCells),
+      moves := [{slay, black}]} =
+        ?SS:slay_dragon(black, StateWithDragonInThreeFreeCells),
 
-    [[], [{black, 7}], [{dragon, 2}], [{green, 9}], [{red, 5}]] =
+    [[], [{black, 7}], [{dragon, red}], [{green, 9}], [{red, 5}]] =
         lists:sort(Stacks4),
 
-    [empty, empty, {slayed_dragon, 1}] =
+    [empty, empty, {slayed_dragon, black}] =
         lists:sort([Free1Value, Free2Value, Free3Value]).
 
 test_remove_dragon(_Config) ->
-    Stack1 = [{dragon, 1}, {1, red}, {2, green}],
+    Stack1 = [{dragon, black}, {1, red}, {2, green}],
     Stack2 = [{3, black}, {1, red}, {2, green}],
     Stack3 = [{9, red}, {1, red}, {5, black}],
 
     Stacks = [Stack1, Stack2, Stack3],
 
     State = #{stacks => Stacks,
-              moves => [{slay, 1}]},
+              moves => [{slay, black}]},
 
     #{stacks := NewStacks} = ?SS:remove_dragon(Stack1, State),
     true = lists:member(tl(Stack1), NewStacks),
@@ -713,7 +703,7 @@ test_is_valid_stack_move(_Config) ->
                {finished, red} => [{1, green}]},
     false = ?SS:is_valid_stack_move({x, x, State9}),
 
-    MoveDragonToFinished = {[{dragon, 1}], '->', {finished, green}},
+    MoveDragonToFinished = {[{dragon, black}], '->', {finished, green}},
     State10 = #{moves => [MoveDragonToFinished],
                {finished, red} => []},
     false = ?SS:is_valid_stack_move({x, x, State10}),
@@ -721,45 +711,49 @@ test_is_valid_stack_move(_Config) ->
     NewBacktrackingSourceStack =
         [{1, red}, {3, black}, {9, green}],
     NewTargetStack11 =
-        [{dragon, 1}, {4, red}, {9, black}],
+        [{dragon, black}, {4, red}, {9, black}],
     NewStacks11 =
         [NewTargetStack11, NewBacktrackingSourceStack],
-    PrevStacks11 = [NewBacktrackingSourceStack],
+    PrevStacks11 = gb_sets:from_list([NewBacktrackingSourceStack]),
     Move11 = {[{1, red}], '->', {3, black}},
     State11 = #{moves => [Move11],
                 stacks => NewStacks11,
-                previous_stacks => NewStacks11 ++ PrevStacks11},
+                previous_stacks =>
+                    gb_sets:union(PrevStacks11,
+                                  gb_sets:from_list(NewStacks11))},
     false = ?SS:is_valid_stack_move({PrevStacks11,
                                      NewBacktrackingSourceStack,
                                      State11}),
 
     NewSourceStack12 =
-        [{dragon, 1}, {4, red}, {9, black}],
+        [{dragon, black}, {4, red}, {9, black}],
     NewBacktrackingTargetStack =
         [{1, red}, {3, black}, {9, green}],
     NewStacks12 =
         [NewSourceStack12, NewBacktrackingTargetStack],
-    PrevStacks12 = [NewBacktrackingTargetStack],
+    PrevStacks12 = gb_sets:from_list([NewBacktrackingTargetStack]),
     Move12 = {[{1, red}], '->', {3, black}},
     State12 = #{moves => [Move12],
                 stacks => NewStacks12,
-                previous_stacks => NewStacks12 ++ PrevStacks12},
+                previous_stacks =>
+                    gb_sets:union(PrevStacks12,
+                                  gb_sets:from_list(NewStacks12))},
     false = ?SS:is_valid_stack_move({PrevStacks12,
                                      NewBacktrackingSourceStack,
                                      State12}),
 
     NewSourceStack13 =
-        [{dragon, 2}],
+        [{dragon, red}],
     NewStacks13 =
-        [[{1, green}, {dragon, 1}, {3, green}],
-         [{dragon, 2}]],
+        [[{1, green}, {dragon, black}, {3, green}],
+         [{dragon, red}]],
     NewSourceStack13 =
-        [{dragon, 2}],
+        [{dragon, red}],
     PrevStacks13 =
-        [[{3, green}],
-         [{1, green}, {dragon, 1}, {dragon, 2}]],
+        gb_sets:from_list([[{3, green}],
+                           [{1, green}, {dragon, black}, {dragon, red}]]),
     MoveStackWithDragon =
-        {[{1, green}, {dragon, 1}], '->', [{3, green}]},
+        {[{1, green}, {dragon, black}], '->', [{3, green}]},
     State13 = #{moves => [MoveStackWithDragon],
                 stacks => NewStacks13,
                 previous_stacks => PrevStacks13},
@@ -772,13 +766,15 @@ test_is_valid_stack_move(_Config) ->
         [[{5, green}, {3, red}, {6, black}],
          NewSourceStack14],
     PrevStacks14 =
-        [[{6, black}],
-         [{5, green}, {3, red}, {1, black}]],
+        gb_sets:from_list([[{6, black}],
+                           [{5, green}, {3, red}, {1, black}]]),
     MoveOutOfOrderStack =
         {[{5, green}, {3, red}], '->', [{6, black}]},
     State14 = #{moves => [MoveOutOfOrderStack],
                 stacks => NewStacks14,
-                previous_stacks => NewStacks14 ++ PrevStacks14},
+                previous_stacks =>
+                    gb_sets:union(PrevStacks14,
+                                  gb_sets:from_list(NewStacks14))},
     false = ?SS:is_valid_stack_move({PrevStacks14,
                                      NewSourceStack14,
                                      State14}),
@@ -788,30 +784,36 @@ test_is_valid_stack_move(_Config) ->
         [[{5, green}, {3, red}, {8, red}],
          NewSourceStack15],
     PrevStacks15 =
-        [[{2, green}, {3, green}, {5, green}, {3, red}, {8, red}],
-         [{4, black}]],
+        gb_sets:from_list([[{2, green}, {3, green}, {5, green},
+                            {3, red}, {8, red}],
+                           [{4, black}]]),
     MoveNonAlternatingSuitStack =
         {[{2, green}, {3, green}], '->', [{4, black}]},
     State15 = #{moves => [MoveNonAlternatingSuitStack],
                 stacks => NewStacks15,
-                previous_stacks => NewStacks15 ++ PrevStacks15},
+                previous_stacks =>
+                    gb_sets:union(PrevStacks15,
+                                  gb_sets:from_list(NewStacks15))},
     false = ?SS:is_valid_stack_move({PrevStacks15,
                                      NewSourceStack15,
                                      State15}),
 
     NewSourceStack16 =
-        [{2, green}, {3, black}, {dragon, 2}],
+        [{2, green}, {3, black}, {dragon, red}],
     NewStacks16 =
         [[{5, green}, {3, red}, {8, red}],
          NewSourceStack16],
     PrevStacks16 =
-        [[{2, green}, {3, black}, {5, green}, {3, red}, {8, red}],
-         [{dragon, 2}]],
+        gb_sets:from_list([[{2, green}, {3, black},
+                            {5, green}, {3, red}, {8, red}],
+                           [{dragon, red}]]),
     MoveStackToDragon =
-        {[{2, green}, {3, black}], '->', [{dragon, 2}]},
+        {[{2, green}, {3, black}], '->', [{dragon, red}]},
     State16 = #{moves => [MoveStackToDragon],
                 stacks => NewStacks16,
-                previous_stacks => NewStacks16 ++ PrevStacks16},
+                previous_stacks =>
+                    gb_sets:union(PrevStacks16,
+                                  gb_sets:from_list(NewStacks16))},
     false = ?SS:is_valid_stack_move({PrevStacks16,
                                      NewSourceStack16,
                                      State16}),
@@ -822,13 +824,16 @@ test_is_valid_stack_move(_Config) ->
         [[{5, green}, {3, red}, {8, red}],
          NewSourceStack17],
     PrevStacks17 =
-        [[{2, black}, {3, green}, {5, green}, {3, red}, {8, red}],
-         [{5, red}]],
+        gb_sets:from_list([[{2, black}, {3, green}, {5, green},
+                            {3, red}, {8, red}],
+                           [{5, red}]]),
     MoveStackNonSequentially =
         {[{2, black}, {3, green}], '->', [{5, red}]},
     State17 = #{moves => [MoveStackNonSequentially],
                 stacks => NewStacks17,
-                previous_stacks => NewStacks17 ++ PrevStacks17},
+                previous_stacks =>
+                    gb_sets:union(PrevStacks17,
+                                  gb_sets:from_list(NewStacks17))},
     false = ?SS:is_valid_stack_move({PrevStacks17,
                                      NewSourceStack17,
                                      State17}),
@@ -839,13 +844,16 @@ test_is_valid_stack_move(_Config) ->
         [[{5, green}, {3, red}, {8, red}],
          NewSourceStack18],
     PrevStacks18 =
-        [[{2, black}, {3, green}, {5, green}, {3, red}, {8, red}],
-         [{4, green}]],
+        gb_sets:from_list([[{2, black}, {3, green},
+                            {5, green}, {3, red}, {8, red}],
+                           [{4, green}]]),
     MoveStackOntoMatchingSuit =
         {[{2, black}, {3, green}], '->', [{4, green}]},
     State18 = #{moves => [MoveStackOntoMatchingSuit],
                 stacks => NewStacks18,
-                previous_stacks => NewStacks18 ++ PrevStacks18},
+                previous_stacks =>
+                    gb_sets:union(PrevStacks18,
+                                  gb_sets:from_list(NewStacks18))},
     false = ?SS:is_valid_stack_move({PrevStacks18,
                                      NewSourceStack18,
                                      State18}).
@@ -860,22 +868,17 @@ test_get_orig_target_stack(_Config) ->
     MovedStack = [1, 2, 3],
     [4, 5, 6] = ?SS:get_orig_target_stack(MovedStack, Stacks).
 
-test_remove_stack(_Config) ->
-    [] = ?SS:remove_stack([], []),
-    [1] = ?SS:remove_stack([], [1]),
-    [1, 2] = ?SS:remove_stack([], [1, 2]),
-    [2] = ?SS:remove_stack([1], [1, 2]),
-    [3, 4] = ?SS:remove_stack([1, 2], [1, 2, 3, 4]).
+moves(Cards) ->
+    {'_', '_', #{moves => [{Cards, '->', '_'}]}}.
 
 test_has_alternating_suits(_Config) ->
-    true = ?SS:has_alternating_suits([]),
-    true = ?SS:has_alternating_suits([{1, black}]),
-    true = ?SS:has_alternating_suits([{1, black}, {2, red}]),
-    true = ?SS:has_alternating_suits([{1, black}, {2, green}]),
-    false = ?SS:has_alternating_suits([{1, black}, {2, black}]),
-    true = ?SS:has_alternating_suits([{1, black}, {3, green}, {9, red}]),
-    true = ?SS:has_alternating_suits([{1, black}, {3, red}, {9, black}]),
-    false = ?SS:has_alternating_suits([{1, black}, {3, red}, {9, red}]).
+    true = ?SS:has_alternating_suits(moves([{1, black}])),
+    true = ?SS:has_alternating_suits(moves([{1, black}, {2, red}])),
+    true = ?SS:has_alternating_suits(moves([{1, black}, {2, green}])),
+    false = ?SS:has_alternating_suits(moves([{1, black}, {2, black}])),
+    true = ?SS:has_alternating_suits(moves([{1, black}, {3, green}, {9, red}])),
+    true = ?SS:has_alternating_suits(moves([{1, black}, {3, red}, {9, black}])),
+    false = ?SS:has_alternating_suits(moves([{1, black}, {3, red}, {9, red}])).
 
 test_sub_stacks(_Config) ->
     %dbg:tracer(),
