@@ -63,12 +63,13 @@ It either doesn't work, or doesn't work fast enough. I left it running for one h
 I could add advanced moves:
 1. Swap two cards that are out of order: e.g. if there is a 7 red, 5 red, 6 green, I could use the swap spaces to hold the 6 green, then 5 red, then put the 6 green back on the 7 red and then the 5 red on the 6 green
 1. Take advantage of the three different colours to exchange substacks to free up target stacks: if we have a card that could fit in a stack but the stack is already occupied _and_ if we have somewhere else we could move the cards that are occupying the necessary spot, we can move a substack to free up the space: for example:
-Stack 1:
-red 6
-green 5
-Stack 2: 
-black 6
-swap space:
-black 5
-We can't simply move "b5" (black 5) from swap to b6, but we _can_ move g5 to b6 and then move b5 to r6. 
 
+- Stack 1:
+  - red 6
+  - green 5
+- Stack 2: 
+  - black 6
+- swap space:
+  - black 5
+
+  We can't simply move "b5" (black 5) from swap to b6, but we _can_ move g5 to b6 and then move b5 to r6. 
