@@ -12,7 +12,6 @@ The game is loosley based on solitaire but has major differences:
 - Three colours instead of four suits in two colours:
   - Red, green, black instead of black aces, black clubs, red diamonds
   - alternating colours can be stacked in numerical order
-and red hearts
 - Dragons
   - Three sets of four cards that can be removed from the board when they're all showing
   - each set of dragon cards that is removed takes up one of the swap spaces
